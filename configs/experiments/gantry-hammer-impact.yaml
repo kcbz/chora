@@ -1,0 +1,7 @@
+id: gantry-hammer-impact
+name: "Hammer \xB7 Mounted impact rig"
+description: Scanned claw hammer; a straight, motor-off impact replaces SO-101 pressing.
+  Fresh experiment with no inherited scores.
+robot: xyz_tool_rig
+task: impact_nail
+simulation: {}

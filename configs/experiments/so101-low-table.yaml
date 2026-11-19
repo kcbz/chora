@@ -1,0 +1,10 @@
+id: so101-low-table
+name: SO-101 · Low table
+description: Place the bowl on a lower table. This experiment has its own data and model outputs.
+category: archived
+hidden: true
+robot: so101
+task: bowl_pick_place
+simulation:
+  table_height: 0.04
+  target: [0.175, 0.090, 0.04]

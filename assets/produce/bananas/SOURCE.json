@@ -1,0 +1,32 @@
+{
+  "source": "https://polyhaven.com/a/bananas",
+  "license": "CC0-1.0",
+  "files": [
+    {
+      "path": "bananas_2k.gltf",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/bananas/bananas_2k.gltf",
+      "sha256": "fc2aef01104e4bf7d1738a80c8ccbf0c5006175533c68ef29d1b073c426781d8"
+    },
+    {
+      "path": "textures/bananas_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/bananas/bananas_nor_gl_2k.jpg",
+      "sha256": "e3df19df3911ef00ce4158ff9587463e70510ffe9d0ef74f60f1c9b1829ae472"
+    },
+    {
+      "path": "textures/bananas_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/bananas/bananas_diff_2k.jpg",
+      "sha256": "d0727524b53b5a6f5aa5f661eed95269ed563252d0b022097ae6f5f219af1bb2"
+    },
+    {
+      "path": "textures/bananas_arm_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/bananas/bananas_arm_2k.jpg",
+      "sha256": "46cd08e7965ce2da88c68eee128571b600fe2563808dcbca667d9b25548e20fa"
+    },
+    {
+      "path": "bananas.bin",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/bananas/bananas.bin",
+      "sha256": "c98b7dbabd8ceb70c9b8ea92611c7c7833dd86c118c8013b941eb379bee26774"
+    }
+  ],
+  "physics": "No measured constitutive, friction or fracture parameters supplied"
+}

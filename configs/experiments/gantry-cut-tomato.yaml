@@ -1,0 +1,8 @@
+id: gantry-cut-tomato
+name: "Knife \xB7 Tomato material lab"
+description: Real chef-knife mesh; deformable flesh and skin. Experimental material
+  trial, not the old rigid-half cutting score.
+robot: xyz_tool_rig
+task: soft_cut
+simulation: {}
+fruit: tomato

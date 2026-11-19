@@ -1,0 +1,10 @@
+id: so101-kitchen-staging
+name: Ingredient transfer · Legacy demonstration
+description: A solid-object transfer demonstration. This does not implement cutting, cooking, or pouring.
+category: archived
+hidden: true
+robot: so101
+task: ingredient_staging
+simulation:
+  table_height: 0.04
+  target: [0.175, 0.090, 0.04]

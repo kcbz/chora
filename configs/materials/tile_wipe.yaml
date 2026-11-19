@@ -1,0 +1,31 @@
+schema_version: 2
+calibrated: false
+units: SI
+parameters:
+  cup_radius_m: 0.03
+  cup_sliding_friction: 0.6
+  vacuum_force_limit_n: 40.0
+  sponge_dimensions_m:
+  - 0.05
+  - 0.036
+  - 0.01
+  sponge_sliding_friction: 0.45
+  sponge_contact_time_constant_s: 0.018
+provenance:
+  status: engineering_assumption
+  source: Custom simulation cup/sponge fixture only; tile geometry and estimated mass
+    come from tiling_baseline.yaml
+  uncertainty: unknown
+  conditions: nominal dry tile and rubber-like cup; sponge response has not been measured
+    wet
+  calibration_records: []
+missing_models:
+- Full floor/wall installation dynamics
+- Resolved grout free-surface flow and pore-scale sponge absorption
+- Tile fracture and impact damage
+calibration_plan:
+- Record tile product, caliper dimensions, mass and surface finish.
+- Measure vacuum pressure, effective sealed area, leak rate and normal/shear pull-off.
+- Measure sponge force-displacement curves dry and wet, friction and water uptake.
+- Fit force traces on held-out wipe paths; report errors and valid load/speed range.
+tile_product_record: configs/materials/tiling_baseline.yaml

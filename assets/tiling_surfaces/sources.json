@@ -1,0 +1,54 @@
+{
+  "scope": "appearance_analogue_not_product_scan_or_wet_material_measurement",
+  "assets": [
+    {
+      "file": "terracotta_floor_tiles_diff_1k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/terracotta_floor_tiles/terracotta_floor_tiles_diff_1k.jpg",
+      "sha256": "966ff423065e4a4ce9490864fba61fdb491985d4a2c60eb2b85181c7e7edcd5d",
+      "license": "CC0",
+      "source": "https://polyhaven.com/a/terracotta_floor_tiles"
+    },
+    {
+      "file": "terracotta_floor_tiles_disp_1k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/terracotta_floor_tiles/terracotta_floor_tiles_disp_1k.jpg",
+      "sha256": "590d357e07029a392cc057bb212b99a6df4356edf7a5ae390a2ff5ebc4da7cdc",
+      "license": "CC0",
+      "source": "https://polyhaven.com/a/terracotta_floor_tiles"
+    },
+    {
+      "file": "scuffed_cement_diff_1k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/scuffed_cement/scuffed_cement_diff_1k.jpg",
+      "sha256": "45ef8951432f0b692dc461178a898fb83b2e5a873ba53fb19041e9356e118e4a",
+      "license": "CC0",
+      "source": "https://polyhaven.com/a/scuffed_cement"
+    },
+    {
+      "file": "terracotta_floor_tiles_diff_4k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/terracotta_floor_tiles/terracotta_floor_tiles_diff_4k.jpg",
+      "sha256": "5c18f0b44dd87c1f9d7846b64b102d68a6bfe9e2d4b157fafb9de6e260e79ec5",
+      "license": "CC0",
+      "source": "https://polyhaven.com/a/terracotta_floor_tiles"
+    },
+    {
+      "file": "terracotta_floor_tiles_disp_4k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/terracotta_floor_tiles/terracotta_floor_tiles_disp_4k.jpg",
+      "sha256": "c5942c13c8fc6e280f992fca79edc535c567f64ee532ff9b1ddfe4094263fb13",
+      "license": "CC0",
+      "source": "https://polyhaven.com/a/terracotta_floor_tiles"
+    }
+  ],
+  "derived_files": [
+    {
+      "file": "scuffed_cement_diff_1k.png",
+      "source_file": "scuffed_cement_diff_1k.jpg",
+      "operation": "lossless JPEG decoding to PNG for MuJoCo compatibility; pixels not retouched",
+      "sha256": "cf801a0705bc02c4e4267c18029cb1bebf8955e42f0ced67fa16b52e39af196b"
+    },
+    {
+      "file": "terracotta_floor_tiles_diff_4k.png",
+      "source_file": "terracotta_floor_tiles_diff_4k.jpg",
+      "operation": "lossless JPEG decoding to PNG for MuJoCo compatibility; pixels not retouched",
+      "sha256": "371e085f43ea9258ee036f9837698156bd6af3ece2f9218b0bf5781c716ee477"
+    }
+  ]
+}

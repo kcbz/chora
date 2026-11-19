@@ -1,0 +1,2 @@
+# Optional one-time USD-to-OBJ asset conversion; not required to run Chora.
+usd-core==26.11

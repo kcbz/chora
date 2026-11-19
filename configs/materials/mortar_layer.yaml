@@ -1,0 +1,24 @@
+schema_version: 1
+scope: simulation_only_reduced_material_model
+hardware_validated: false
+source_catalog: configs/materials/tiling_baseline.yaml
+parameters:
+  cells_per_tile_edge: 16
+  reservoir_volume_m3: 0.0005
+  ridge_height_m: 0.008
+  target_bed_m: 0.003
+  normal_damping_pa_s_per_m: 15000.0
+  plastic_relaxation_pa_s_per_m: 60000.0
+  confinement_factor: 0.2
+  bedding_contact_fraction: 0.85
+  tangential_force_to_normal_cap: 0.5
+status: All parameters here are simulation assumptions or numerical resolution choices.
+limitations:
+  - Height field with a linear elastic contact foundation and assumed confinement-dependent plastic relaxation; not 3D fluid or mortar FEM.
+  - HB shear, yield, age and contact stiffness use explicitly assumed coefficients in the source catalog.
+  - Displaced volume fills available voids across the same tile footprint; local flow/front propagation is not resolved.
+  - Squeeze-out is a conserved outside-footprint compartment rendered uniformly at the perimeter, not a predicted extrusion shape.
+  - No pore absorption, water separation, evaporation, hydrated chemistry, fresh tensile bond or cured bond model.
+  - Material gravity/inertia transfer is omitted; the applicator carries a fixed conservative lumped payload, not a changing fluid mass.
+  - Contact area is measured within this grid/model, not manufacturer coverage certification.
+  - Face vacuum and metering/comb head are simplified installed custom fixtures, not manufacturer CAD or verified hardware.

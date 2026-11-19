@@ -1,0 +1,8 @@
+id: so101-construction-staging
+name: Part transfer · Legacy demonstration
+description: A solid-object pick-and-place demonstration. This does not implement construction work.
+category: archived
+hidden: true
+robot: so101
+task: part_staging
+simulation: {}

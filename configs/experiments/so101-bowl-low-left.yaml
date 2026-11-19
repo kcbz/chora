@@ -1,0 +1,21 @@
+id: so101-bowl-low-left
+name: "Bowl \xB7 Low platform, left"
+description: "Fixed bowl scene: start x 130\u2013170 mm, platform at (150, 105) mm\
+  \ and 35 mm high. Separate results from the original trained bowl scene."
+robot: so101
+task: bowl_pick_place
+simulation:
+  table_center:
+  - 0.15
+  - 0.105
+  table_height: 0.035
+  target:
+  - 0.15
+  - 0.105
+  - 0.035
+  spawn_x:
+  - 0.13
+  - 0.17
+  spawn_y:
+  - -0.1
+  - -0.065

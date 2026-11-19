@@ -1,0 +1,26 @@
+[
+  {
+    "file": "brochure.pdf",
+    "url": "https://metroceramics.com/wp-content/uploads/2026/07/Metropolitan-Deluxe-Brochure-March-20262.pdf",
+    "sha256": "6680444c331bdab2729fa2ac4187b988fdebe66b7040f9eb0f6b97e33110e9b8",
+    "retrieved_utc": "2026-11-19T01:25:54.646111+00:00"
+  },
+  {
+    "file": "test_results.pdf",
+    "url": "https://metroceramics.com/wp-content/uploads/2023/07/Metropolitan-Ceramics-Test-Results-2023.pdf",
+    "sha256": "45383e96f604225fccbef5cb073766a519bcdcb3a49562f4325c26f8c7897beb",
+    "retrieved_utc": "2026-11-19T01:25:54.728363+00:00"
+  },
+  {
+    "file": "sds.pdf",
+    "url": "https://metroceramics.com/wp-content/uploads/2022/03/Ironrock-SDS-Quarry-Tile-Thin-Brick-01-30-2022-1.pdf",
+    "sha256": "456719a4fa58e63b56d0f8de83107d1823e42eee52d8c0d5146d2fe46f7e04c6",
+    "retrieved_utc": "2026-11-19T01:25:54.875734+00:00"
+  },
+  {
+    "file": "ironspot.pdf",
+    "url": "https://metroceramics.com/wp-content/uploads/2023/07/QuarryBasics-Ironspot-Sell-Sheet.pdf",
+    "sha256": "6a137a6ff2a8155596718b1fe69456d545fe62dfbb0f3be5b871e51db9e80d80",
+    "retrieved_utc": "2026-11-19T01:25:55.035561+00:00"
+  }
+]

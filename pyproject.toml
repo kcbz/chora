@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coherence-chora"
+version = "0.1.0"
+description = "A local robot learning lab by Coherence"
+requires-python = ">=3.12,<3.14"
+dependencies = ["mujoco>=3.3,<4.1", "numpy", "scipy", "pyyaml", "imageio", "imageio-ffmpeg", "pillow", "matplotlib"]
+
+[project.optional-dependencies]
+train = ["mlx-lm[train]>=0.32,<0.33; sys_platform == 'darwin'"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+chora = "chora.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["chora*"]
+
+[tool.setuptools.package-data]
+chora = ["web/*.html", "web/*.css", "web/*.js", "web/*.svg"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

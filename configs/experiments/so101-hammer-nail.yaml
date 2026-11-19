@@ -1,0 +1,6 @@
+id: so101-hammer-nail
+name: SO-101 · Hammer a nail
+description: Mounted hammer drives a guided nail through contact forces against sliding resistance. Reach 20 mm depth and retreat. A constrained fixture, not a wood-fracture model.
+robot: so101
+task: hammer_nail
+simulation: {}

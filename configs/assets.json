@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "downloads": [
+    {
+      "path": "assets/tiling_surfaces/scuffed_cement_diff_1k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/scuffed_cement/scuffed_cement_diff_1k.jpg",
+      "sha256": "45ef8951432f0b692dc461178a898fb83b2e5a873ba53fb19041e9356e118e4a",
+      "license": "CC0",
+      "group": "runtime"
+    },
+    {
+      "path": "assets/tiling_surfaces/terracotta_floor_tiles_diff_4k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/terracotta_floor_tiles/terracotta_floor_tiles_diff_4k.jpg",
+      "sha256": "5c18f0b44dd87c1f9d7846b64b102d68a6bfe9e2d4b157fafb9de6e260e79ec5",
+      "license": "CC0",
+      "group": "runtime"
+    },
+    {
+      "path": "assets/tiling_surfaces/terracotta_floor_tiles_disp_4k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/terracotta_floor_tiles/terracotta_floor_tiles_disp_4k.jpg",
+      "sha256": "c5942c13c8fc6e280f992fca79edc535c567f64ee532ff9b1ddfe4094263fb13",
+      "license": "CC0",
+      "group": "runtime"
+    },
+    {
+      "path": "assets/material_sources/laticrete/254_platinum.pdf",
+      "url": "https://cdnmdm.laticrete.com/Datasheet/NA/14/Datasheet_NA_en_14.pdf",
+      "sha256": "ba49eb351838a251ecf12b563283638e368c66b555568bdb2b2753d04fd1fc25",
+      "group": "documents",
+      "license": "Publisher document; local reference retrieval only, not bundled or relicensed"
+    },
+    {
+      "path": "assets/material_sources/laticrete/permacolor.pdf",
+      "url": "https://cdnmdm.laticrete.com/Datasheet/NA/5600/Datasheet_NA_en_5600.pdf",
+      "sha256": "9fca3c8b546170848badbc3abb002de735f610ecb36dce1151654568ccc4f3de",
+      "group": "documents",
+      "license": "Publisher document; local reference retrieval only, not bundled or relicensed"
+    },
+    {
+      "path": "assets/material_sources/metro_31is/brochure.pdf",
+      "url": "https://metroceramics.com/wp-content/uploads/2026/07/Metropolitan-Deluxe-Brochure-March-20262.pdf",
+      "sha256": "6680444c331bdab2729fa2ac4187b988fdebe66b7040f9eb0f6b97e33110e9b8",
+      "group": "documents",
+      "license": "Publisher document; local reference retrieval only, not bundled or relicensed"
+    },
+    {
+      "path": "assets/material_sources/metro_31is/test_results.pdf",
+      "url": "https://metroceramics.com/wp-content/uploads/2023/07/Metropolitan-Ceramics-Test-Results-2023.pdf",
+      "sha256": "45383e96f604225fccbef5cb073766a519bcdcb3a49562f4325c26f8c7897beb",
+      "group": "documents",
+      "license": "Publisher document; local reference retrieval only, not bundled or relicensed"
+    },
+    {
+      "path": "assets/material_sources/metro_31is/sds.pdf",
+      "url": "https://metroceramics.com/wp-content/uploads/2022/03/Ironrock-SDS-Quarry-Tile-Thin-Brick-01-30-2022-1.pdf",
+      "sha256": "456719a4fa58e63b56d0f8de83107d1823e42eee52d8c0d5146d2fe46f7e04c6",
+      "group": "documents",
+      "license": "Publisher document; local reference retrieval only, not bundled or relicensed"
+    },
+    {
+      "path": "assets/material_sources/metro_31is/ironspot.pdf",
+      "url": "https://metroceramics.com/wp-content/uploads/2023/07/QuarryBasics-Ironspot-Sell-Sheet.pdf",
+      "sha256": "6a137a6ff2a8155596718b1fe69456d545fe62dfbb0f3be5b871e51db9e80d80",
+      "group": "documents",
+      "license": "Publisher document; local reference retrieval only, not bundled or relicensed"
+    }
+  ],
+  "derived": [
+    {
+      "path": "assets/tiling_surfaces/scuffed_cement_diff_1k.png",
+      "source": "assets/tiling_surfaces/scuffed_cement_diff_1k.jpg",
+      "sha256": "cf801a0705bc02c4e4267c18029cb1bebf8955e42f0ced67fa16b52e39af196b"
+    },
+    {
+      "path": "assets/tiling_surfaces/terracotta_floor_tiles_diff_4k.png",
+      "source": "assets/tiling_surfaces/terracotta_floor_tiles_diff_4k.jpg",
+      "sha256": "371e085f43ea9258ee036f9837698156bd6af3ece2f9218b0bf5781c716ee477"
+    }
+  ]
+}

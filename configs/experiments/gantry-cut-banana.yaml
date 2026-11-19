@@ -1,0 +1,8 @@
+id: gantry-cut-banana
+name: "Knife \xB7 Banana material lab"
+description: Real chef-knife mesh; deformable flesh and skin. Experimental material
+  trial, not the old rigid-half cutting score.
+robot: xyz_tool_rig
+task: soft_cut
+simulation: {}
+fruit: banana

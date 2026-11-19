@@ -1,0 +1,7 @@
+id: ur10e-hammer
+name: UR10e · Hammer a nail
+description: Articulated UR10e with scanned hammer and contact-triggered retraction;
+  uncalibrated impact trial.
+robot: ur10e
+task: impact_nail
+simulation: {}

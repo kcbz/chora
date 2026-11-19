@@ -1,0 +1,9 @@
+id: so101-precision
+name: SO-101 · Precision placement
+description: A target-tolerance variation of bowl placement, not a separate task.
+category: archived
+hidden: true
+robot: so101
+task: bowl_pick_place
+simulation:
+  target_half_size: [0.038, 0.034]

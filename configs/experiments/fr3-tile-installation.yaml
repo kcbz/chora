@@ -1,0 +1,6 @@
+id: fr3-tile-installation
+name: FR3 pair · Adhesive and tile bedding
+description: Two-arm adhesive application and 2 × 2 tile bedding. Finite, spatial mortar model with declared assumptions; no grout finishing or fracture.
+robot: fr3_pair
+task: tile_adhesive_bedding
+simulation: {}

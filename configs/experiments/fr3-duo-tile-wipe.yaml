@@ -1,0 +1,7 @@
+id: fr3-duo-tile-wipe
+name: FR3 Duo · Ceramic tile cleanup
+description: QuarryBasics 31IS ceramic tile, manufacturer dimensions and estimated
+  mass. Contact-coupled grout-residue transport; simulation-only cleanup subtask.
+robot: fr3_duo
+task: dual_tile_wipe
+simulation: {}

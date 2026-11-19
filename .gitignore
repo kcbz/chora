@@ -1,0 +1,30 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.cache/
+.DS_Store
+assets/menagerie/
+assets/qwen/
+outputs/
+*.egg-info/
+.env
+
+# Local credentials and generated files
+.env.*
+!.env.example
+*.pem
+*.key
+MUJOCO_LOG.TXT
+build/
+dist/
+
+# Restricted or unneeded source files stay local; never publish their binaries.
+assets/kitchen_knife/*
+!assets/kitchen_knife/SOURCE-NOTICE.txt
+assets/material_sources/**/*.pdf
+assets/produce/tomato/*.usd
+
+# Runtime download cache; URLs, licenses and checksums remain in Git.
+assets/tiling_surfaces/*.jpg
+assets/tiling_surfaces/*.png
+assets/produce/*/textures/*.png

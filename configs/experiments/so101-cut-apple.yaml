@@ -1,0 +1,13 @@
+id: so101-cut-apple
+name: "Knife \xB7 Apple"
+description: Steel knife, cutting board and apple. Procedural skin/interior appearance;
+  uncalibrated layered cutting model with a predefined cut plane.
+robot: so101
+task: cut_fruit
+simulation:
+  table_height: 0.03
+  target:
+  - 0.175
+  - 0.09
+  - 0.03
+fruit: apple

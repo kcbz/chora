@@ -1,0 +1,171 @@
+{
+  "animationCount": 0,
+  "categories": [
+    {
+      "uid": "b3631aefd82b4eeba37aa5fc0b73b05a",
+      "name": "Food & Drink",
+      "slug": "food-drink",
+      "uri": "https://api.sketchfab.com/v3/categories/b3631aefd82b4eeba37aa5fc0b73b05a",
+      "icon": "https://static.sketchfab.com/static/builds/web/dist/static/assets/images/icons/categories/dac08ea5b8779b2cef7a4c81327df721-v2.svg",
+      "thumbnails": [
+        {
+          "width": "512",
+          "height": "288",
+          "url": "https://static.sketchfab.com/categories/b3631aefd82b4eeba37aa5fc0b73b05a/512x288.png"
+        },
+        {
+          "width": "800",
+          "height": "450",
+          "url": "https://static.sketchfab.com/categories/b3631aefd82b4eeba37aa5fc0b73b05a/800x450.png"
+        }
+      ]
+    },
+    {
+      "uid": "1a99e2b67fc84de0b3ea0d3925208a04",
+      "name": "Nature & Plants",
+      "slug": "nature-plants",
+      "uri": "https://api.sketchfab.com/v3/categories/1a99e2b67fc84de0b3ea0d3925208a04",
+      "icon": "https://static.sketchfab.com/static/builds/web/dist/static/assets/images/icons/categories/98a605cec9718b6f02f1a5759039a5ad-v2.svg",
+      "thumbnails": [
+        {
+          "width": "512",
+          "height": "288",
+          "url": "https://static.sketchfab.com/categories/1a99e2b67fc84de0b3ea0d3925208a04/512x288.png"
+        },
+        {
+          "width": "800",
+          "height": "450",
+          "url": "https://static.sketchfab.com/categories/1a99e2b67fc84de0b3ea0d3925208a04/800x450.png"
+        }
+      ]
+    }
+  ],
+  "commentCount": 2,
+  "createdAt": "2021-01-23T12:36:14.919834",
+  "embedUrl": "https://sketchfab.com/models/201d42a9e5e54f1b836eff39a892ed88/embed",
+  "faceCount": 390848,
+  "isAgeRestricted": false,
+  "license": {
+    "uri": "https://api.sketchfab.com/v3/licenses/322a749bcfa841b29dff1e8a1bb74b0b",
+    "label": "CC Attribution",
+    "fullName": "Creative Commons Attribution",
+    "requirements": "Author must be credited. Commercial use is allowed.",
+    "url": "http://creativecommons.org/licenses/by/4.0/",
+    "slug": "by"
+  },
+  "likeCount": 103,
+  "name": "Tomato 2",
+  "publishedAt": "2021-01-23T13:03:16.963550",
+  "soundCount": 0,
+  "staffpickedAt": null,
+  "tags": [
+    {
+      "name": "Tomato",
+      "slug": "tomato",
+      "uri": "https://api.sketchfab.com/v3/tags/tomato"
+    },
+    {
+      "name": "vegetables",
+      "slug": "vegetables",
+      "uri": "https://api.sketchfab.com/v3/tags/vegetables"
+    }
+  ],
+  "thumbnails": {
+    "images": [
+      {
+        "uid": "5e2cad9ff8f3445db97640296a7e5f4e",
+        "width": 1920,
+        "height": 1080,
+        "size": 339075,
+        "url": "https://media.sketchfab.com/models/201d42a9e5e54f1b836eff39a892ed88/thumbnails/6ad42c0feae04ab6b51b602fbfa66010/bff807f914344cf292c5f7b341906e64.jpeg"
+      },
+      {
+        "uid": "378958e59e4c4aaea22aedbfec2e2f85",
+        "width": 1024,
+        "height": 576,
+        "size": 66734,
+        "url": "https://media.sketchfab.com/models/201d42a9e5e54f1b836eff39a892ed88/thumbnails/6ad42c0feae04ab6b51b602fbfa66010/16e961503a334d86a1c01ecd525468a2.jpeg"
+      },
+      {
+        "uid": "736a8191734f4a429de1df41cae67c8b",
+        "width": 720,
+        "height": 405,
+        "size": 31617,
+        "url": "https://media.sketchfab.com/models/201d42a9e5e54f1b836eff39a892ed88/thumbnails/6ad42c0feae04ab6b51b602fbfa66010/8d76bb5a49f74c6bafefb1075d2e7160.jpeg"
+      },
+      {
+        "uid": "3694a7d2e5e34758a80e67a9634e04ef",
+        "width": 256,
+        "height": 144,
+        "size": 4771,
+        "url": "https://media.sketchfab.com/models/201d42a9e5e54f1b836eff39a892ed88/thumbnails/6ad42c0feae04ab6b51b602fbfa66010/f984a32b9bed45c082f0de5a0f997698.jpeg"
+      },
+      {
+        "uid": "739d58c9012046549908012b32d271a1",
+        "width": 64,
+        "height": 36,
+        "size": 846,
+        "url": "https://media.sketchfab.com/models/201d42a9e5e54f1b836eff39a892ed88/thumbnails/6ad42c0feae04ab6b51b602fbfa66010/eabaee95f01a4c1eb8b2d7af26c91055.jpeg"
+      }
+    ]
+  },
+  "uid": "201d42a9e5e54f1b836eff39a892ed88",
+  "uri": "https://api.sketchfab.com/v3/models/201d42a9e5e54f1b836eff39a892ed88",
+  "user": {
+    "uid": "4dba9edeffdb4a7db3fc390c0b35bced",
+    "username": "moshecaine",
+    "displayName": "Moshe Caine",
+    "account": "pro",
+    "profileUrl": "https://sketchfab.com/moshecaine",
+    "avatar": {
+      "uid": "b510c573284541f2b5f3ac5f9e1a5d1f",
+      "uri": "https://api.sketchfab.com/v3/avatars/b510c573284541f2b5f3ac5f9e1a5d1f",
+      "images": [
+        {
+          "width": 32,
+          "height": 32,
+          "size": 1047,
+          "url": "https://media.sketchfab.com/avatars/b510c573284541f2b5f3ac5f9e1a5d1f/9a97495d71494f5798dce316b335a2a0.jpeg"
+        },
+        {
+          "width": 48,
+          "height": 48,
+          "size": 1420,
+          "url": "https://media.sketchfab.com/avatars/b510c573284541f2b5f3ac5f9e1a5d1f/8739246685cc4a9a9be4343b103fb462.jpeg"
+        },
+        {
+          "width": 90,
+          "height": 90,
+          "size": 2732,
+          "url": "https://media.sketchfab.com/avatars/b510c573284541f2b5f3ac5f9e1a5d1f/0a79f4dc78864af7bd42687091c914c1.jpeg"
+        },
+        {
+          "width": 100,
+          "height": 100,
+          "size": 3098,
+          "url": "https://media.sketchfab.com/avatars/b510c573284541f2b5f3ac5f9e1a5d1f/a0db7fc278c0461d9606fb8dc51e6cde.jpeg"
+        }
+      ]
+    },
+    "uri": "https://api.sketchfab.com/v3/users/4dba9edeffdb4a7db3fc390c0b35bced"
+  },
+  "vertexCount": 195648,
+  "viewCount": 9487,
+  "viewerUrl": "https://sketchfab.com/3d-models/tomato-2-201d42a9e5e54f1b836eff39a892ed88",
+  "isDownloadable": true,
+  "isProtected": false,
+  "description": "Tomato\n\nFrom the Vegetables series\n\nPhotogrammetry",
+  "price": null,
+  "downloadCount": 3542,
+  "editorUrl": "https://sketchfab.com/models/201d42a9e5e54f1b836eff39a892ed88/edit",
+  "status": {
+    "warning": {},
+    "processing": "SUCCEEDED"
+  },
+  "source": "website",
+  "hasCommentsDisabled": false,
+  "updatedAt": "2022-07-21T07:32:58.498046",
+  "pbrType": null,
+  "textureCount": 1,
+  "materialCount": 2
+}

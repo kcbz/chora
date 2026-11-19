@@ -1,0 +1,8 @@
+id: fr3-cut-banana
+name: FR3 · Cut banana
+description: Native 7-axis FR3 with installed chef knife; force-guarded, uncalibrated
+  deformable-material trial.
+robot: fr3
+task: soft_cut
+fruit: banana
+simulation: {}

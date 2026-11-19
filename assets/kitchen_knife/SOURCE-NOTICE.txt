@@ -1,0 +1,71 @@
+CoSiGen robobench assets — NOTICE
+
+Dataset license: Apache License 2.0 (LICENSE). Third-party assets retain their upstream licenses.
+Per-directory sources and licenses (mirrors the dataset card, README.md):
+
+ - `cobotta_pro_1300`, `festo_cobot`, `gen3n7`, `jaco2_n7`, `lite6_gripper`, `rizon4`, `sawyer`, `schunk_egk25`, `xarm7`, `xarm_gripper`, `z1` | NVIDIA Isaac Sim 5.1 asset library (`Robots/...`), vendored, some with small physics-schema patches | NVIDIA Omniverse asset terms (upstream terms)
+ - `franka`, `panda_hand` | Franka Emika Panda (`panda_instanceable.usd`, Isaac Sim asset library); `panda_hand` is the hand carved out of it | NVIDIA Omniverse asset terms (upstream terms)
+ - `g1` (+ `policies/agile_locomotion.pt`) | Unitree G1 29-DoF, Isaac Sim 5.1 cloud assets `Robots/Unitree/G1`; policy from Isaac Lab `Policies/Agile` | NVIDIA Omniverse asset terms (upstream terms)
+ - `gr1t2` | Fourier GR1-T2 via `isaaclab_assets` (Isaac Nucleus), URDF generated in-repo | NVIDIA Omniverse asset terms (upstream terms)
+ - `piper` | AgileX official `agilexrobotics/piper_isaac_sim` @ `8e1f88f` | upstream terms (repo publishes no license file)
+ - `wxai` | Trossen Robotics official `TrossenRobotics/trossen_ai_isaac` @ `e5fccea` | BSD-3-Clause
+ - `wx250s` | `mujoco_menagerie/trossen_wx250s` (from Interbotix's URDF), converted with Isaac Lab's MJCF converter | BSD-3-Clause
+ - `composites` | arm + gripper welds baked from the USDs above; no new geometry | inherits the parts' licenses
+ - `factory` | Isaac Lab **Factory** M16 nut/bolt (`Factory/factory_{nut,bolt}_m16.usd`) | NVIDIA Omniverse asset terms (upstream terms)
+ - `allen_bolt`, `allen_key`, `threaded_platform`, `bulb` | authored in-repo; thread geometry transplanted from the Isaac Lab Factory SDF meshes | Apache-2.0 (authored parts); Factory thread as above
+ - `steering_wheel` | Isaac Lab Mimic `pick_place_task/pick_place_assets/steering_wheel.usd` | NVIDIA Omniverse asset terms (upstream terms)
+ - `props/packing_table*` | Isaac Sim `Props/PackingTable` (textures downsampled) | NVIDIA Omniverse asset terms (upstream terms)
+ - `props/lab_table`, `props/ground` | source not recorded | upstream terms
+ - `pc` | `GAMING_PC.usdc` visual and textures, vendored; case fixtures authored in-repo | upstream terms (source not recorded)
+ - `so101` | SO-101 arm parts (STS3215 servo, screws), drill; parts follow the official NVIDIA `so101_new_calib` USD | upstream terms (source not recorded)
+ - `ikea_table` | table and legs from the legacy four-leg environment | upstream terms (source not recorded)
+ - `egg_carton` | [RoboDojo](https://huggingface.co/datasets/RoboDojo-Benchmark/RoboDojo) `fill_egg_holder` assets, sha256-pinned | Apache-2.0 (dataset card) / MIT (code repo)
+ - `clear_organic_objects`, `fruits_on_plate` | NVlabs [RoboLab](https://github.com/NVlabs/RoboLab) object sets (`fruits_veggies`, `vomp`, `hot3d`) | Apache-2.0
+ - `chest`, `knife`, `scissors`, `stapler`, `toolbox`, `pen_holder` | scanned product models | upstream terms (source not recorded)
+ - `push_shapes` | T block from [RoboDojo](https://huggingface.co/datasets/RoboDojo-Benchmark/RoboDojo) `push_T`; X/L pieces, pads and board authored in-repo | Apache-2.0
+ - `capsule` | authored in-repo | Apache-2.0
+ - `bowls`, `cup_green`, `serving_tray`, `coffee_machine`, `microwave`, `kitchen`, `medical_cart`, `syringe`, `tube_rack` | scanned product models | upstream terms (source not recorded)
+ - `cutting/assets/baguette_1` | Baguette | terrielsimmons | CC BY | https://sketchfab.com/3d-models/ba8e9641ce0b433bbcb0416e035a9079
+ - `cutting/assets/baguette_2` | Baguette scan M1 | yaro.pro | CC BY | https://sketchfab.com/3d-models/1965f86a45a3480995df29e14d5aa73b
+ - `cutting/assets/banana_1` | Banana | moshecaine | CC BY | https://sketchfab.com/3d-models/f39360ca9e264a96b45cce0a18c963d7
+ - `cutting/assets/banana_2` | Banana - Take 2 | moshecaine | CC BY | https://sketchfab.com/3d-models/c7e1cf5545404752961c4857f95a5bca
+ - `cutting/assets/banana_3` | Banana 3D scan | zdenkoroman | CC BY | https://sketchfab.com/3d-models/c4f9b194abca4db7b4cd0ec6270f9d60
+ - `cutting/assets/banana_4` | Banana | chytamrealitu | CC BY | https://sketchfab.com/3d-models/7a0d2491b22141398f19c7f11a2f2edf
+ - `cutting/assets/banana_5` | Day 167: Ripe Banana | uttamg911 | CC BY-NC-SA | https://sketchfab.com/3d-models/fbf1b58032f64ec385689623c6b5c036
+ - `cutting/assets/bread_loaf` | Небольшой Батон | Small Loaf | hoxsvl | CC BY | https://sketchfab.com/3d-models/b51b8f4bfb954e508dbf3f72249d84ce
+ - `cutting/assets/carrot_1` | Carrot(3d Scan) | tanophotogrammetry | CC BY | https://sketchfab.com/3d-models/896181392c1f4e2d9316bf2eeafc3042
+ - `cutting/assets/carrot_2` | Scan Carrot-Freepoly.org | blackrray | CC BY | https://sketchfab.com/3d-models/4b7d0eacc1ae44cba343beaff6bf976b
+ - `cutting/assets/carrot_purple` | Carrot (NHMW-AFW-DING-0046-056) | NHMWien | CC BY-NC | https://sketchfab.com/3d-models/6f4f2aa6788b46f2a504307e379e5a1f
+ - `cutting/assets/chili` | Chili Pepper (NHMW-AFW-DING-0046-069) | NHMWien | CC BY-NC | https://sketchfab.com/3d-models/5dfda56321fc4f5ab9f5ca585d97d357
+ - `cutting/assets/corn` | Corn (NHMW-AFW-DING-0046-001) | NHMWien | CC BY-NC | https://sketchfab.com/3d-models/84ffd09580b24b8bbe795ff8975cf12a
+ - `cutting/assets/cucumber_1` | Megascans cucumber (on disk, Fab licence) | Fab | Quixel Megascans (Fab licence)
+ - `cutting/assets/cucumber_2` | TRELLIS.2 generated cucumber (on disk) | generated | generated with TRELLIS.2 (no upstream)
+ - `cutting/assets/cucumber_3` | Cucumber (NHMW-AFW-DING-0046-133) | NHMWien | CC BY-NC | https://sketchfab.com/3d-models/fc74de8ddca0464f97051fdfb6ca8090
+ - `cutting/assets/cucumber_4` | Cucumber (NHMW-AFW-DING-0046-134) | NHMWien | CC BY-NC | https://sketchfab.com/3d-models/c8e79ef4446b46a3a0955ebc19765c87
+ - `cutting/assets/cucumber_5` | Cucumber (NHMW-AFW-DING-0046-034) | NHMWien | CC BY-NC | https://sketchfab.com/3d-models/f6ccf9680f3b4aa0aae77c420715b12e
+ - `cutting/assets/cucumber_6` | Cucumber | db4 | CC BY | https://sketchfab.com/3d-models/0aef5e1b2ef446d7a5663674e75d45c8
+ - `cutting/assets/cucumber_7` | Cucumber | ruda5 | CC BY | https://sketchfab.com/3d-models/9231e77e152d4e54b1673eae6686ba0d
+ - `cutting/assets/cucumber_pickling` | Pickling Cucumber | chapmanecodesign | CC BY | https://sketchfab.com/3d-models/2f0743a1d27345269d1444a8becfce59
+ - `cutting/assets/eggplant_1` | Eggplant (Game Ready / 2K PBR) | meerschaumdigital | CC BY | https://sketchfab.com/3d-models/334a3ab0383f49d1bd34575a36ddf4d6
+ - `cutting/assets/eggplant_2` | Eggplant (NHMW-AFW-DING-0046-118) | NHMWien | CC BY-NC | https://sketchfab.com/3d-models/27f1dfa265344b5e8286b388d3a4e1c8
+ - `cutting/assets/garlic_bread` | Garlic Bread | ngjingcheng | CC BY | https://sketchfab.com/3d-models/aedd82f4db014b94bbce5b99907e382e
+ - `cutting/assets/lotus_root` | Scan Lotus Root-Freepoly.org | blackrray | CC BY | https://sketchfab.com/3d-models/f4fa4b58b6514440bdc2d90817a42083
+ - `cutting/assets/okra` | Bhindi (NHMW-AFW-DING-0046-018) | NHMWien | CC BY-NC | https://sketchfab.com/3d-models/9300fc374592426fa34b50a588d92ecb
+ - `cutting/assets/parsnip` | Parsnip | bartv | CC BY | https://sketchfab.com/3d-models/9270b2c72df04b37bb6d3b6becec67ac
+ - `cutting/assets/sweet_potato` | Sweet Potato | moshecaine | CC BY | https://sketchfab.com/3d-models/8370fa36e3c9456f84be2bfe7e501d27
+ - `cutting/assets/zucchini_1` | barszot zucchini = moshecaine Photocatch (on disk, baked) | CC BY | Sketchfab, author moshecaine (via barszot's mirror)
+ - `cutting/assets/zucchini_2` | zucchini | kayaaku | CC BY | https://sketchfab.com/3d-models/512e5c58293d4eaa83ad0ff9eb5be8e3
+ - `cutting/assets/zucchini_yellow` | Yellow zucchini | thesidekick | CC BY | https://sketchfab.com/3d-models/7a3dc12d96f741ab84d358fd2ac3df28
+ - `cutting/assets/banana` | Banana | ShekhirevaVictoria | CC BY | https://sketchfab.com/3d-models/banana-e0c2951ac0ca47b8978b2a6eca426c3f
+ - `cutting/assets/carrot` | Carrot | Moshe Caine | CC BY | https://sketchfab.com/3d-models/carrot-985240a0da5848e9aa639d5e4daa38e0
+ - `cutting/assets/potato` | Potato | Moshe Caine (probable) | CC BY (probable) | https://sketchfab.com/3d-models/potato-0f4be86441694633b42c764a4574fd41
+ - `cutting/assets/tomato` | Tomato 2 | Moshe Caine (probable) | CC BY (probable) | https://sketchfab.com/3d-models/tomato-2-201d42a9e5e54f1b836eff39a892ed88
+ - `cutting/assets/knife22r` | RoboCasa `knife_22` (Objaverse-derived) | Objaverse per-object CC license (upstream terms) | https://github.com/robocasa/robocasa
+ - `cutting/assets/chopping_board.usd`, `kitchen_island.usd` | Lightwheel kitchen pack | Lightwheel | upstream terms
+ - `deformable/assets/tshirt` | port of Newton's `cloth_folding` example shirt | Apache-2.0 (Newton example)
+ - `deformable/assets/shoes`, `shoe_right_visual.usda` | Sketchfab sneaker pair | upstream terms (Sketchfab; attribution pending)
+ - `deformable/assets/BlackCeramicMug`, `Pitcher` | scanned product models | upstream terms (source not recorded)
+ - `deformable/videos/*.mp4` | recordings of this repository's own smokes | Apache-2.0
+ - `locomanip/assets/brown_box`, `galileo_shelf` | [IsaacLab-Arena](https://github.com/isaac-sim/IsaacLab-Arena) object/background library, sha256-pinned | NVIDIA Omniverse asset terms (upstream terms)
+ - `locomanip/assets/galileo_props` | Isaac Lab Mimic `exhaust_pipe_task` assets | NVIDIA Omniverse asset terms (upstream terms)
+ - `locomanip/assets/fruit_delivery` | authored in-repo | Apache-2.0

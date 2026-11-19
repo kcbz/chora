@@ -1,0 +1,25 @@
+{
+  "name": "Tomato 2",
+  "author": "Moshe Caine",
+  "source": "https://sketchfab.com/3d-models/201d42a9e5e54f1b836eff39a892ed88",
+  "license": {
+    "uri": "https://api.sketchfab.com/v3/licenses/322a749bcfa841b29dff1e8a1bb74b0b",
+    "label": "CC Attribution",
+    "fullName": "Creative Commons Attribution",
+    "requirements": "Author must be credited. Commercial use is allowed.",
+    "url": "http://creativecommons.org/licenses/by/4.0/",
+    "slug": "by"
+  },
+  "mirror": "https://huggingface.co/datasets/EmbodiedSWE/robobench-assets/tree/main/robobench/suites/cutting/assets/tomato",
+  "status": "Two processed pieces inspected; not used in the running simulator. Intact surface reconstruction remains pending.",
+  "files": [
+    {
+      "path": "piece_0.usd",
+      "sha256": "e0cf2b57cf368aa031850896a53c34b6095a3e12c7700de37b4e1440de492a72"
+    },
+    {
+      "path": "piece_8.usd",
+      "sha256": "5c979f690c912be3929f95293de850794521b66f0a6ac98b913145ccf7f07702"
+    }
+  ]
+}

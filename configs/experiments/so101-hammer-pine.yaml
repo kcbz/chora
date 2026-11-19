@@ -1,0 +1,12 @@
+id: so101-hammer-pine
+name: "Hammer \xB7 Pine board"
+description: Free tool held by finger friction. Uncalibrated material model; failures
+  and slips are reported.
+robot: so101
+task: hammer_pine
+simulation:
+  table_height: 0.03
+  target:
+  - 0.175
+  - 0.09
+  - 0.03

@@ -1,0 +1,36 @@
+name: Chora
+company: Coherence
+seed: 42
+simulation:
+  timestep: 0.005
+  max_steps: 15
+  move_seconds: 0.65
+  settle_seconds: 0.5
+  spawn_x: [0.145, 0.205]
+  spawn_y: [-0.105, -0.045]
+  table_height: 0.055
+  target: [0.175, 0.090, 0.055]
+  target_half_size: [0.043, 0.037]
+data:
+  attempts: 1200
+  min_episodes: 200
+  max_per_bin: 20
+  validation_fraction: 0.15
+model:
+  id: mlx-community/Qwen3-1.7B-4bit
+  max_tokens: 96
+training:
+  iterations: 600
+  batch_size: 1
+  learning_rate: 0.0001
+  max_seq_length: 768
+  num_layers: 8
+  rank: 16
+  max_minutes: 50
+evaluation:
+  seed_start: 100000
+  episodes: 100
+visualization:
+  width: 1280
+  height: 960
+  fps: 20

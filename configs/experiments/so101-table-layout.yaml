@@ -1,0 +1,10 @@
+id: so101-table-layout
+name: Table layout · Position and height
+description: "A scene variation of bowl placement: the table is moved left and further back, and lowered. This is not a different manipulation skill."
+robot: so101
+task: bowl_pick_place
+category: variation
+simulation:
+  table_center: [0.16, 0.11]
+  table_height: 0.04
+  target: [0.16, 0.11, 0.04]

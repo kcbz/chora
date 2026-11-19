@@ -1,0 +1,401 @@
+schema_version: 1
+id: metro-31is-laticrete-254-permacolor
+scope: simulation_only
+hardware_validated: false
+sources:
+  metro_brochure:
+    url: https://metroceramics.com/wp-content/uploads/2026/07/Metropolitan-Deluxe-Brochure-March-20262.pdf
+    local: assets/material_sources/metro_31is/brochure.pdf
+    pages:
+    - 2
+    - 3
+    - 7
+  metro_tests:
+    url: https://metroceramics.com/wp-content/uploads/2023/07/Metropolitan-Ceramics-Test-Results-2023.pdf
+    local: assets/material_sources/metro_31is/test_results.pdf
+    pages:
+    - 1
+  adhesive_tds:
+    url: https://cdnmdm.laticrete.com/Datasheet/NA/14/Datasheet_NA_en_14.pdf
+    local: assets/material_sources/laticrete/254_platinum.pdf
+    revision: DS-677-1026
+    pages:
+    - 3
+    - 4
+  grout_tds:
+    url: https://cdnmdm.laticrete.com/Datasheet/NA/5600/Datasheet_NA_en_5600.pdf
+    local: assets/material_sources/laticrete/permacolor.pdf
+    revision: DS-250-1026
+    pages:
+    - 9
+    - 10
+products:
+  tile:
+    manufacturer: Metropolitan Ceramics / Ironrock
+    name: QuarryBasics Ironspot 31IS Mayflower Red
+    type: unglazed ceramic quarry tile
+    published:
+      dimensions:
+        value:
+        - 0.1524
+        - 0.1524
+        - 0.0127
+        unit: m
+        status: manufacturer_reported
+        source: metro_brochure
+        context: Actual face size 6 x 6 in; all Ironspot sizes 1/2 in thick. Uniform-envelope
+          geometry excludes unmeasured back relief/edge rounding.
+      breaking_load_lower_report:
+        value: 3558.5772922083997
+        unit: N
+        status: manufacturer_reported
+        source: metro_tests
+        context: Manufacturer reports 800 lbf or better for 1/2-in family under ASTM
+          C648. Not a SKU/batch distribution, allowable service load, contact-force
+          cap or drop threshold.
+      water_absorption_upper:
+        value: 0.03
+        unit: mass_fraction
+        status: manufacturer_reported
+        source: metro_tests
+        context: ASTM C373 five-hour boil; not a liquid absorption rate or wetting
+          law.
+      wet_dcof_lower:
+        value: 0.6
+        unit: dimensionless
+        status: manufacturer_reported
+        source: metro_tests
+        context: ANSI A326.3/BOT3000 tribometer result; NOT cup, sponge, adhesive
+          or tile/substrate friction.
+      recommended_joint_width:
+        value: 0.009525
+        unit: m
+        status: manufacturer_reported
+        source: metro_brochure
+        context: Nominal 3/8 in joint recommendation. The grout product accepts this
+          width.
+    assumptions:
+      density:
+        value: 2200.0
+        unit: kg/m3
+        status: simulation_assumption
+        reason: Engineering sensitivity parameter; manufacturer does not publish net
+          mass/density in inspected documents.
+        sensitivity_range:
+        - 1800.0
+        - 2600.0
+      sliding_friction:
+        value: 0.5
+        unit: dimensionless
+        status: simulation_assumption
+        reason: Generic contact coefficient; deliberately independent of published
+          wet DCOF.
+        sensitivity_range:
+        - 0.2
+        - 0.8
+    missing:
+    - Net mass of one tile
+    - Measured density and back-relief volume
+    - Elastic modulus and Poisson ratio
+    - Tensile strength distribution and fracture toughness
+    - Edge/corner impact and drop-damage response
+    - Friction against each actual tool/surface; cup seal/leakage
+  adhesive:
+    manufacturer: LATICRETE
+    name: 254 PLATINUM, grey
+    published:
+      wet_density:
+        value: 1650.0
+        unit: kg/m3
+        status: manufacturer_reported
+        source: adhesive_tds
+        context: 'Working properties: 1.65 g/cm3; typical manufacturer value.'
+      pot_life:
+        value: 7200.0
+        unit: s
+        status: manufacturer_reported
+        source: adhesive_tds
+        context: 'Working properties: 2 h. Not a viscosity/cure curve.'
+      open_time:
+        value: 2400.0
+        unit: s
+        status: manufacturer_reported
+        source: adhesive_tds
+        context: 'Working properties: 40 min after spreading. Environment-dependent;
+          conservative simulation cutoff at this anchor.'
+      minimum_before_grouting:
+        value: 86400.0
+        unit: s
+        status: manufacturer_reported
+        source: adhesive_tds
+        context: Minimum 24 h at 70 F / 21 C in installation instructions; not a fresh-tack
+          value.
+      tensile_28day_range:
+        value:
+        - 1800000.0
+        - 2600000.0
+        unit: Pa
+        status: manufacturer_reported
+        source: adhesive_tds
+        context: ISO 13007-2 after 28-day cure. Never assigned to fresh paste.
+      slip_test:
+        value: 0.0005
+        unit: m
+        status: manufacturer_reported
+        source: adhesive_tds
+        context: ISO 13007-2 test result; not a wall-creep constitutive curve.
+      mix_water_per_bag:
+        value:
+        - 5.2
+        - 22.7
+        unit: L_per_kg_pair
+        status: manufacturer_reported
+        source: adhesive_tds
+        context: Approx 5.2 L water per 22.7 kg powder; values kept as a pair rather
+          than an invented density measurement.
+    assumptions:
+      yield_stress:
+        value: 80.0
+        unit: Pa
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 20.0
+        - 200.0
+      consistency:
+        value: 18.0
+        unit: Pa.s^n
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 5.0
+        - 80.0
+      flow_index:
+        value: 0.55
+        unit: dimensionless
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 0.35
+        - 0.9
+      structure_rebuild_time:
+        value: 90.0
+        unit: s
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 30.0
+        - 300.0
+      structure_breakdown_rate:
+        value: 0.12
+        unit: dimensionless
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 0.03
+        - 0.3
+      aging_multiplier:
+        value: 3.0
+        unit: dimensionless
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 1.0
+        - 8.0
+      fresh_tack:
+        value: 300.0
+        unit: Pa
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 0.0
+        - 1000.0
+      normal_stiffness:
+        value: 2000000.0
+        unit: Pa/m
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 500000.0
+        - 10000000.0
+    missing:
+    - Flow curves by batch age, shear history and temperature
+    - Early-age normal/tangential tack and wall-creep data
+    - Cure curve for this tile/substrate assembly
+  grout:
+    manufacturer: LATICRETE
+    name: PERMACOLOR Grout
+    published:
+      pot_life_range:
+        value:
+        - 2700.0
+        - 3600.0
+        unit: s
+        status: manufacturer_reported
+        source: grout_tds
+        context: 45-60 min at 70 F / 21 C. Baseline takes the lower end as conservative
+          action cutoff.
+      final_set_range:
+        value:
+        - 7200.0
+        - 10800.0
+        unit: s
+        status: manufacturer_reported
+        source: grout_tds
+        context: 2-3 h; does not provide an entire cure-strength curve.
+      mix_water_per_bag:
+        value:
+        - - 2.3
+          - 2.5
+        - 11.3
+        unit: L_per_kg_pair
+        status: manufacturer_reported
+        source: grout_tds
+        context: 2.3-2.5 L water per 11.3 kg powder.
+      joint_width_range:
+        value:
+        - 0.0015
+        - 0.012
+        unit: m
+        status: manufacturer_reported
+        source: grout_tds
+        context: Manufacturer range 1/16-1/2 in, rounded metric 1.5-12 mm.
+      initial_cleaning_wait_range:
+        value:
+        - 1200.0
+        - 1800.0
+        unit: s
+        status: manufacturer_reported
+        source: grout_tds
+        context: First cleaning approximately 20-30 min at 21 C. Wider joints/cooler
+          conditions can extend the wait; not a complete cleanability law.
+      flexural_28day_range:
+        value:
+        - 8500000.0
+        - 9200000.0
+        unit: Pa
+        status: manufacturer_reported
+        source: grout_tds
+        context: ISO 13007-4 after 28-day cure; not assigned to fresh grout.
+      compressive_28day_range:
+        value:
+        - 35700000.0
+        - 36800000.0
+        unit: Pa
+        status: manufacturer_reported
+        source: grout_tds
+        context: ISO 13007-4 after 28-day cure; not assigned to fresh grout.
+      shrinkage_28day_range:
+        value:
+        - 0.00051
+        - 0.00062
+        unit: strain
+        status: manufacturer_reported
+        source: grout_tds
+        context: ISO 13007-4 reported 0.51-0.62 mm/m; no shrinkage kinetics supplied.
+    assumptions:
+      wet_density:
+        value: 2000.0
+        unit: kg/m3
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 1700.0
+        - 2300.0
+      yield_stress:
+        value: 120.0
+        unit: Pa
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 30.0
+        - 300.0
+      consistency:
+        value: 12.0
+        unit: Pa.s^n
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 3.0
+        - 60.0
+      flow_index:
+        value: 0.6
+        unit: dimensionless
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 0.35
+        - 0.95
+      structure_rebuild_time:
+        value: 60.0
+        unit: s
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 20.0
+        - 180.0
+      structure_breakdown_rate:
+        value: 0.1
+        unit: dimensionless
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 0.02
+        - 0.3
+      aging_multiplier:
+        value: 4.0
+        unit: dimensionless
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 1.0
+        - 10.0
+      wipe_rate:
+        value: 0.35
+        unit: 1/s
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 0.05
+        - 1.0
+      residue_adhesion_age_rate:
+        value: 2.0
+        unit: dimensionless
+        status: simulation_assumption
+        reason: Explicit reduced-order simulation choice; not measured or supplied
+          by the manufacturer.
+        sensitivity_range:
+        - 0.5
+        - 5.0
+    missing:
+    - Wet density
+    - Flow and yield curves versus age and working
+    - Residue adhesion, sponge uptake and wash-out coefficients
+baseline:
+  temperature_c: 21.0
+  relative_humidity: 0.5
+  environment_effects: Held fixed. No claimed calibrated temperature/humidity kinetics.
+  tile_mass_method: uniform_envelope_volume_times_assumed_density
+  simulation_strength_policy: No fracture threshold inferred from ASTM C648. Damage
+    remains unmodeled until a separate declared constitutive model exists.
+  panel_rows: 2
+  panel_columns: 2
+  placement_error_tolerance_m: 0.002
+  adhesive_wet_bed_height_m: 0.006
+  nominal_bedded_gap_m: 0.003

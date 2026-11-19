@@ -1,0 +1,21 @@
+id: so101-bowl-high-right
+name: "Bowl \xB7 High platform, right"
+description: "Fixed bowl scene: start x 180\u2013220 mm, platform at (190, 75) mm\
+  \ and 65 mm high. Separate results from the original trained bowl scene."
+robot: so101
+task: bowl_pick_place
+simulation:
+  table_center:
+  - 0.19
+  - 0.075
+  table_height: 0.065
+  target:
+  - 0.19
+  - 0.075
+  - 0.065
+  spawn_x:
+  - 0.18
+  - 0.22
+  spawn_y:
+  - -0.09
+  - -0.045
