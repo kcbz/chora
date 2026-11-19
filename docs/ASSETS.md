@@ -1,6 +1,6 @@
 # Workspace setup and asset policy
 
-Chora code is proprietary; see LICENSE. Third-party code and assets retain their
+Chora code is proprietary; see [LICENSE](../LICENSE). Third-party code and assets retain their
 own licenses. Publishing this repository does not grant an open-source license
 to Coherence's code.
 
@@ -42,7 +42,7 @@ is retained for provenance, not as a license grant for the omitted asset.
 Unused processed tomato USD pieces and generated JPG-to-PNG produce copies are
 also excluded. Produce PNGs are regenerated from the retained CC0 JPGs at runtime.
 The licensed YCB hammer and CC0 produce source files retain their provenance in
-THIRD_PARTY.md. Original downloaded files on the development machine are not
+[THIRD_PARTY.md](THIRD_PARTY.md). Original downloaded files on the development machine are not
 deleted by the publication cleanup.
 
 ## Source workspace versus wheel

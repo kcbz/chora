@@ -1,11 +1,13 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "coherence-chora"
 version = "0.1.0"
 description = "A local robot learning lab by Coherence"
+authors = [{name = "Kodiak Berkoff"}, {name = "Dhruv Sirohi"}]
+license-files = ["LICENSE", "docs/THIRD_PARTY.md"]
 requires-python = ">=3.12,<3.14"
 dependencies = ["mujoco>=3.3,<4.1", "numpy", "scipy", "pyyaml", "imageio", "imageio-ffmpeg", "pillow", "matplotlib"]
 
