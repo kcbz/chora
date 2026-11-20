@@ -8,6 +8,7 @@
 
 <p align="center">
   <a href="#environment-and-setup">Setup</a> ·
+  <a href="#launch-the-ui">Launch the UI</a> ·
   <a href="#usage">Usage</a> ·
   <a href="#testing">Testing</a> ·
   <a href="docs/README.md">Documentation</a>
@@ -18,6 +19,23 @@
 Chora is a local robot-learning lab for building and inspecting manipulation
 tasks in MuJoCo. It combines scripted experts, recorded demonstrations and local
 Qwen imitation learning with a browser interface for simulation and evaluation.
+
+## Launch the UI
+
+After [setup](#environment-and-setup), run this from the `chora` project folder:
+
+```bash
+.venv/bin/python -m chora serve
+```
+
+Then open **[http://127.0.0.1:8765/](http://127.0.0.1:8765/)** in your browser.
+Keep the Terminal window running while using the UI. Press **Ctrl-C** there to
+stop the server. You can also double-click `Launch Chora.command` in Finder.
+
+| Command | Purpose |
+| --- | --- |
+| `doctor` | Prints environment/package information and basic asset availability, then exits |
+| `serve` | Starts the local web server that provides the browser UI |
 
 ## Why Chora?
 
@@ -55,9 +73,13 @@ robot models and retrieves checksum-verified tiling textures. MuJoCo runs the
 physics; macOS OpenGL renders the scene, and MLX handles local model training and
 inference. No paid model API or OpenAI API key is required.
 
+To inspect the installed environment and basic asset availability:
+
 ```bash
 .venv/bin/python -m chora doctor
 ```
+
+Launch the browser interface with [`serve`](#launch-the-ui).
 
 Some cutting assets are intentionally not distributed because their licensing is
 unresolved. See [asset setup](docs/ASSETS.md) for availability, optional reference
@@ -65,14 +87,8 @@ PDFs and wheel/workspace configuration.
 
 ## Usage
 
-```bash
-.venv/bin/python -m chora serve
-```
-
-Open [the local lab](http://127.0.0.1:8765), select a scene and policy, and click
+With [the local lab running](#launch-the-ui), select a scene and policy, and click
 **Run episode**. A trained student is available only when its local adapter exists.
-You can also launch the lab by double-clicking `Launch Chora.command` in Finder.
-Stop the server with Ctrl-C in its Terminal window.
 
 - Drag to orbit, Shift-drag or right-drag to pan, and scroll to zoom.
 - Use **Front view** and **Top view** for preset camera angles.
