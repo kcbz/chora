@@ -1,0 +1,14 @@
+id: so101-part-raised-shelf
+name: "Block · Raised shelf"
+description: "Carry a solid block from a farther pickup zone to a cobalt shelf across the arm."
+instructions: "Grasp the block, lift it clear of the shelf, and release it flat inside the marked area."
+robot: so101
+task: part_staging
+simulation:
+  table_center: [0.204, 0.13]
+  table_height: 0.095
+  table_style: shelf
+  table_rgba: [0.23, 0.42, 0.76, 1]
+  target: [0.204, 0.13, 0.095]
+  spawn_x: [0.195, 0.22]
+  spawn_y: [-0.142, -0.123]

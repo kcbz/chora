@@ -47,10 +47,14 @@ class Expert:
             # transport. Correct the placement from the observed bowl position.
             if self.phase == 5:
                 self.release_xy = np.array(obs["tcp"][:2]) + self.place[:2] - b[:2]
+                if "target_at_release" in obs:
+                    # Keep the bowl bottom about 6 mm over the moving surface
+                    # so opening the gripper does not scrape it sideways.
+                    self.release_z = self.place[2] + .008 + obs["tcp"][2] - b[2]
             target[:2] = self.release_xy
         actions = [move([*p[:2],self.height]), move(p), {"action":"close_gripper"},
                    move([*p[:2],self.height]), move([*target[:2],self.height]),
-                   move([*target[:2],self.place[2]+.021]), {"action":"open_gripper"},
+                   move([*target[:2],getattr(self,"release_z",self.place[2]+.021)]), {"action":"open_gripper"},
                    move([*target[:2],self.height]), {"action":"done"}]
         action = actions[min(self.phase,len(actions)-1)]
         self.phase += 1

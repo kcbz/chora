@@ -91,7 +91,7 @@ def build_model(cfg, *, policy_cameras=False):
                            size=[.009,.009,lower/2], rgba=[.25,.32,.37,1])
     table.add_geom(name="table", type=mujoco.mjtGeom.mjGEOM_BOX,
                    pos=[table_x,table_y,(h+lower)/2], size=[.083,.074,(h-lower)/2],
-                   rgba=[.33,.39,.37,1], **({"mass":1.} if motion else {}))
+                   rgba=cfg.get("table_rgba", [.33,.39,.37,1]), **({"mass":1.} if motion else {}))
     hx, hy = cfg["target_half_size"]
     for axis in range(2):
         for sign in [-1, 1]:
@@ -133,10 +133,12 @@ def build_model(cfg, *, policy_cameras=False):
         colour=[.63,.35,.22,1] if kind=="part" else [.73,.82,.43,1]
         bowl.add_geom(name="transfer_object",type=mujoco.mjtGeom.mjGEOM_BOX,size=[half,half,half],mass=.018,rgba=colour,friction=[1.8,.01,.001],condim=6)
     front = np.array([.49,-.49,.36])
-    z = front-np.array([.11,0,.18]); z /= np.linalg.norm(z)
+    extended_workspace = cfg.get("table_style") == "shelf" or motion
+    lookat = [.145,-.015,.155] if extended_workspace else [.11,0,.18]
+    z = front-np.array(lookat); z /= np.linalg.norm(z)
     x = np.cross([0,0,1],z); x /= np.linalg.norm(x)
     y = np.cross(z,x)
-    w.add_camera(name="front", pos=front, xyaxes=np.r_[x,y], fovy=42)
+    w.add_camera(name="front", pos=front, xyaxes=np.r_[x,y], fovy=48 if extended_workspace else 42)
     w.add_camera(name="top", pos=[.13,0,.66], xyaxes=[1,0,0,0,1,0], fovy=48)
     if policy_cameras:
         # Optical axis follows the gripper toward its TCP; camera has no mass/contact.
@@ -273,14 +275,18 @@ class Simulation:
                 "tcp": [round(float(x),4) for x in self.tcp], "gripper_open": self.gripper_open,
                 "grasped": grasped, "step": self.step_index, "last_result": self.result}
         if self.platform_motion:
-            # Look ahead by the time for a descent, settle and initial opening.
-            # This uses the commanded rail motion, which is known to both policies.
+            # Use measured carriage position and velocity, plus the known
+            # drive frequency, to extrapolate through the descent and opening.
             lead_time = self.cfg["move_seconds"] + .12 + .10
-            x, y, z = self.cfg["target"]
-            prediction = y + self._platform_reference(self.data.time + lead_time)
+            x, center_y, z = self.cfg["target"]
+            offset = float(self.data.qpos[self.platform_qpos])
+            velocity = float(self.data.qvel[self.platform_dof])
+            omega = self.platform_omega
+            angle = omega * lead_time
+            prediction = center_y + offset * math.cos(angle) + (velocity / omega) * math.sin(angle)
             observation["target"] = [round(v, 4) for v in observation["target"]]
             observation["target_at_release"] = [x, round(prediction, 4), z]
-            observation["target_velocity"] = [0., round(float(self.data.qvel[self.platform_dof]), 4), 0.]
+            observation["target_velocity"] = [0., round(velocity, 4), 0.]
         if self.object_kind!="bowl":
             observation["object"]=observation.pop("bowl")
             observation["object_yaw"]=observation.pop("bowl_yaw")

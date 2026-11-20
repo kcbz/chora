@@ -6,6 +6,7 @@ task: bowl_pick_place
 simulation:
   table_center: [0.18, 0.09]
   table_height: 0.05
+  table_rgba: [0.16, 0.49, 0.52, 1]
   target: [0.18, 0.09, 0.05]
   spawn_y: [-0.105, -0.052]
   target_half_size: [0.043, 0.046]

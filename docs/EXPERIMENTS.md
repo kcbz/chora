@@ -138,17 +138,21 @@ a shared collision world and coordinated actions. Register implemented adapters
 in `chora/experiments.py` and the simulator/controller factories. Keep outputs
 and benchmark claims separate by task.
 
-## Bowl scenes and their students
+## Pick-and-place scenes and their students
 
 - **Standard platform** is the original fixed-target scene and uses the existing
   trained Qwen adapter.
-- **Raised shelf** places the goal on a 95 mm shelf with a longer carry from the
-  pickup zone. The expert lifts the bowl higher to clear the shelf.
+- **Block · Raised shelf** uses a solid block and a 95 mm cobalt shelf. Both
+  are farther from the arm than in the first shelf preset. The expert pinches
+  the block and carries it across the work area.
 - **Moving platform** uses a motorized slide with up to 32 mm of travel to either
   side of center. The marked goal moves with the platform. A successful release
   stays upright, fully inside the goal, and stable relative to the platform
   throughout the settle check. The structured observation includes the measured
-  platform velocity and a predicted goal position to plan the release.
+  platform velocity and a predicted goal position to plan the release. Each
+  seed selects a starting phase and a peak speed between 16 and 24 mm/s.
+  The forecast uses measured position, velocity, and the known rail frequency.
+  Curation groups starts by pickup pose, rail position, and direction.
 
 Each scene has separate demonstrations, adapters, and evaluation results. In the
 lab, select **Qwen · State-based imitation** and choose **Go to training**. Pass

@@ -12,7 +12,7 @@ import yaml
 
 from .paths import WORKSPACE_ROOT as ROOT
 DEFAULT="so101-bowl"
-FIXED_SCENES=(DEFAULT,"so101-bowl-raised-shelf","so101-bowl-moving-platform","ur10e-hammer","fr3-cut-apple","fr3-cut-tomato","fr3-cut-banana","fr3-tile-installation")
+FIXED_SCENES=(DEFAULT,"so101-part-raised-shelf","so101-bowl-moving-platform","ur10e-hammer","fr3-cut-apple","fr3-cut-tomato","fr3-cut-banana","fr3-tile-installation")
 PRESETS=ROOT/"configs/experiments"
 TASKS={
     "tile_adhesive_bedding":{"name":"Tile · Adhesive and bedding","object":"tile","instructions":"Arm B meters and combs each adhesive patch while arm A acquires and lifts its tile on the same physics timeline. Local clearance permits placement; the applicator parks after its final patch. A spatial reduced mortar layer supplies contact loads, redistributes ridge volume and tracks squeeze-out. This is an assumed simulation material law, not a resolved fluid or validated hardware model. Setting, grout/cleanup and fracture remain unimplemented."},
@@ -67,7 +67,7 @@ def validate_scene(scene):
     def number(value,lo,hi,label):
         if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or not lo<=value<=hi:
             raise ValueError(f"{label} must be between {lo*1000:g} and {hi*1000:g} mm")
-    for key,lo,hi in (("spawn_x",.13,.22),("spawn_y",-.12,-.035)):
+    for key,lo,hi in (("spawn_x",.13,.22),("spawn_y",-.145,-.035)):
         values=scene[key]
         if not isinstance(values,list) or len(values)!=2:
             raise ValueError("Spawn bounds require two coordinates")
@@ -89,6 +89,13 @@ def validate_scene(scene):
         raise ValueError("The target region must fit on the table")
     if scene.get("table_style") not in (None, "shelf"):
         raise ValueError("Unknown table style")
+    if "table_rgba" in scene:
+        rgba = scene["table_rgba"]
+        if not isinstance(rgba, list) or len(rgba) != 4:
+            raise ValueError("Table color requires four RGBA channels")
+        if any(not isinstance(value, (int, float)) or isinstance(value, bool) or
+               not math.isfinite(value) or not 0 <= value <= 1 for value in rgba):
+            raise ValueError("Table color channels must be between 0 and 1")
     if "platform_motion" in scene:
         motion = scene["platform_motion"]
         if not isinstance(motion, dict) or set(motion) != {"travel", "peak_speed"}:
@@ -155,7 +162,7 @@ def load_config(experiment=DEFAULT):
         cfg["experiment"]={k:value[k] for k in ("id","name","description","robot","task")}
         return cfg
     overrides=value.get("simulation",{})
-    allowed={"spawn_x","spawn_y","target","target_half_size","table_height","table_center","table_style","platform_motion"}
+    allowed={"spawn_x","spawn_y","target","target_half_size","table_height","table_center","table_style","table_rgba","platform_motion"}
     if set(overrides)-allowed:
         raise ValueError("Preset contains unsupported scene settings")
     cfg["simulation"].update(copy.deepcopy(overrides))
@@ -182,7 +189,7 @@ def public_definition(experiment=DEFAULT):
     cfg=load_config(experiment)
     task=TASKS[cfg["experiment"]["task"]]
     meta=definition(experiment)
-    instructions=task['instructions']
+    instructions=meta.get('instructions',task['instructions'])
     if cfg["simulation"].get("platform_motion"):
         instructions = "Pick up the bowl, intercept the moving platform, release it inside the green outline, and retreat. The bowl must remain upright and stable relative to the platform."
     if cfg['experiment']['robot']=='fr3':instructions='A native 7-axis FR3 carries the imported chef knife in a short installed adapter. Inspect real articulated motion, deformable food contact and the 55 N cutting-force stop. Food/skin parameters are uncalibrated; there is no juice solver or validated cutting score.'

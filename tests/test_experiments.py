@@ -3,7 +3,7 @@ import copy
 import pytest
 
 from chora import experiments
-from chora.episodes import rollout
+from chora.episodes import bin_key, rollout
 from chora.policy import make_expert, messages
 from chora.sim import Simulation, make_simulation
 
@@ -14,10 +14,12 @@ def test_fixed_scenes_replace_copy_creation(tmp_path,monkeypatch):
     assert [s['id'] for s in scenes]==list(experiments.FIXED_SCENES)
     bowls=[s for s in scenes if s['task']=='bowl_pick_place']
     assert {scene["id"] for scene in bowls} == {
-        experiments.DEFAULT, "so101-bowl-raised-shelf", "so101-bowl-moving-platform",
+        experiments.DEFAULT, "so101-bowl-moving-platform",
     }
-    assert len({s['simulation']['table_height'] for s in bowls})==3
-    assert len({tuple(s['simulation'].get('table_center',[.175,.09])) for s in bowls})==3
+    raised = next(scene for scene in scenes if scene["id"] == "so101-part-raised-shelf")
+    assert raised["simulation"]["object_kind"] == "part"
+    assert raised["simulation"]["table_height"] == .095
+    assert raised["simulation"]["spawn_y"][1] < original["simulation"]["spawn_y"][0]
     monkeypatch.setattr(experiments,'PRESETS',tmp_path)
     with pytest.raises(ValueError,match='copies'):
         experiments.create_experiment({'id':'my-copy','name':'Copy'})
@@ -83,3 +85,16 @@ def test_expert_intercepts_and_bowl_stays_on_the_moving_platform():
     sim._advance(.5)
     assert sim.is_placed()
     assert abs((sim.bowl[:2] - sim.target[:2] - offset)[1]) < .003
+
+
+def test_platform_forecast_and_selection_use_its_current_motion():
+    cfg = experiments.load_config("so101-bowl-moving-platform")
+    sim = make_simulation(cfg)
+    bins = set()
+    for seed in range(12):
+        obs = sim.reset(seed)
+        bins.add(bin_key({"steps": [{"observation": obs}]}, cfg)[-2:])
+        sim._advance(sim.cfg["move_seconds"] + .12 + .10)
+        assert obs["target_at_release"][1] == pytest.approx(sim.target[1], abs=.003)
+    assert {direction for _, direction in bins} == {0, 1}
+    assert {position for position, _ in bins} == {0, 1, 2}

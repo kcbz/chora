@@ -24,10 +24,13 @@ class Stopped(Exception):
     pass
 
 def scene_orbit(experiment):
-    robot=load_config(experiment)['experiment']['robot']
+    cfg = load_config(experiment)
+    robot = cfg['experiment']['robot']
     pose={'azimuth':135,'elevation':-25,'distance':.65,'lookat':[.12,0,.16]}
     if robot in {'fr3','ur10e','fr3_duo','fr3_pair'}:pose.update(distance=1.8,lookat=[.4,0,.4])
     elif robot=='xyz_tool_rig':pose.update(distance=1.15,lookat=[0,.1,.27])
+    elif cfg["simulation"].get("table_style") == "shelf" or cfg["simulation"].get("platform_motion"):
+        pose.update(distance=.76, lookat=[.15,-.015,.145])
     return pose
 
 

@@ -113,11 +113,19 @@ def object_observation(episode):
 
 def bin_key(episode,cfg):
     o = episode["steps"][0]["observation"]
+    scene = cfg["simulation"]
+    motion = scene.get("platform_motion")
+    positions = 2 if motion else 4
+    obj = o.get("object", o.get("bowl"))
     cells = []
-    for i,axis in enumerate(("spawn_x","spawn_y")):
-        lo,hi = cfg["simulation"][axis]
-        cells.append(int(np.clip(4*(o.get("object",o.get("bowl"))[i]-lo)/(hi-lo),0,3)))
-    cells.append(int(np.clip(4*(o.get("object_yaw",o.get("bowl_yaw"))+math.pi)/(2*math.pi),0,3)))
+    for i, axis in enumerate(("spawn_x", "spawn_y")):
+        lo, hi = scene[axis]
+        cells.append(int(np.clip(positions * (obj[i] - lo) / (hi - lo), 0, positions - 1)))
+    cells.append(int(np.clip(4 * (o.get("object_yaw", o.get("bowl_yaw")) + math.pi) / (2 * math.pi), 0, 3)))
+    if motion:
+        origin, travel = scene["target"][1], motion["travel"]
+        relative = (o["target"][1] - origin + travel) / (2 * travel)
+        cells.extend([int(np.clip(3 * relative, 0, 2)), int(o["target_velocity"][1] >= 0)])
     return tuple(cells)
 
 
@@ -131,6 +139,7 @@ def curate():
     dropped = Counter()
     groups = defaultdict(list)
     signatures = set()
+    motion = cfg["simulation"].get("platform_motion")
     for e in raw:
         reason = None
         if not e["success"]:
@@ -143,6 +152,9 @@ def curate():
             reason = "reserved_seed"
         duplicate_resolution=.0005 if e.get("task")=="cut_fruit" else .002
         signature = tuple(round(x/duplicate_resolution) for x in object_observation(e)[0][:2]) + (round(object_observation(e)[1]/.1),)
+        if motion and reason is None:
+            start = e["steps"][0]["observation"]
+            signature += (round(start["target"][1] / .002), round(start["target_velocity"][1] / .002))
         if reason is None and signature in signatures:
             reason = "near_duplicate_start"
         if reason:
@@ -178,11 +190,13 @@ def curate():
               "train_episodes":len(train),"validation_episodes":len(valid),
               "training_pairs":sum(len(e["steps"]) for e in train),
               "validation_pairs":sum(len(e["steps"]) for e in valid),
-              "drop_reasons":dict(dropped),"occupied_bins":len(groups),"total_bins":16 if cfg["experiment"]["task"] in {"hammer_nail","hammer_pine","impact_nail","cut_fruit"} else 64,
+              "drop_reasons":dict(dropped),"occupied_bins":len(groups),"total_bins":96 if motion else 16 if cfg["experiment"]["task"] in {"hammer_nail","hammer_pine","impact_nail","cut_fruit"} else 64,
               "train_seeds":[e["seed"] for e in train],"validation_seeds":[e["seed"] for e in valid],
               "raw_sha256":hashlib.sha256(raw_path.read_bytes()).hexdigest(),
               "quality_score":("100 * nail_depth_m (hammer) or cut_progress (cutting) - 0.1 * decisions - tcp_path_m" if cfg["experiment"]["task"] in {"hammer_nail","hammer_pine","impact_nail","cut_fruit"} else "100 * placement_margin_m - 0.1 * decisions - tcp_path_m"),
               "action_counts":dict(Counter(s["action"]["action"] for e in selected for s in e["steps"]))}
+    if motion:
+        report["coverage_dimensions"] = "pickup pose, platform position, and direction"
     save_json(OUTPUT/"curation.json",report)
     job_progress(3,4,"Writing the curated dataset and coverage report…")
     save_json(directory/"episodes.json",selected)

@@ -219,3 +219,10 @@ or validated real material behavior.
   All 53 archived standard-scene VLA rollouts passed physics replay.
 - Matched the viewport to the scene feed's aspect ratio so the image fills the
   card without cropping.
+
+- Replaced the shelf bowl with a solid block and moved both the pickup and
+  cobalt shelf farther out. The block expert passed 100 held-out scenes.
+- Made the carriage teal and revised the moving expert's forecast and release
+  clearance. It passed 100 fresh held-out scenes across all six position and
+  direction combinations, plus 49 of 50 routine check scenes. Moving-platform
+  curation now accounts for rail position and direction.
