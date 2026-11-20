@@ -1,8 +1,11 @@
 """Compact, evidence-backed episode wall and verified final-state thumbnails."""
 import json
 from html import escape
+from pathlib import Path
+from urllib.parse import quote
 
 from .common import OUTPUT, exclusive_job, job_progress, read_json, save_json
+from .experiments import output_url
 from .ui import page
 
 
@@ -55,7 +58,7 @@ CSS="""
 @media(max-width:1250px){.episode-wall{grid-template-columns:repeat(8,minmax(0,1fr))}.episode-wall-heading{align-items:flex-start;flex-direction:column;gap:16px}}@media(max-width:900px){.episode-wall{grid-template-columns:repeat(6,minmax(0,1fr))}}@media(max-width:600px){.episode-wall{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.episode-wall-heading h2{font-size:20px}.pill-group button{padding:8px 12px;font-size:11px}.outcome-badge{width:17px;height:17px;right:4px;top:4px}.episode-modal-header,.episode-info{padding:16px}}@media(max-width:430px){.wall-controls{width:100%}.wall-controls>.pill-group:first-child{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-radius:12px}.wall-controls>.pill-group:first-child button{white-space:normal;padding:8px 6px;min-height:40px;line-height:1.3;font-size:11px}}@media(max-width:380px){.episode-wall{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(prefers-reduced-motion:reduce){.episode-tile{transition:none}.episode-tile:hover{transform:none}}
 """
 
-SCRIPT="""
+SCRIPT=r"""
 const gallery=JSON.parse(document.getElementById('episode-data').textContent);
 let policy=gallery.initial || (gallery.policies.student?'student':Object.keys(gallery.policies)[0]),outcome='all';
 const titles={student:'trained student',base:'untrained baseline',expert:'scripted expert'};
@@ -66,44 +69,85 @@ function filterWall(nextPolicy=policy,nextOutcome=outcome){
  document.querySelectorAll('[data-wall-outcome]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.wallOutcome===outcome)));
  const summary=gallery.policies[policy];document.getElementById('wall-title').textContent=summary?`${summary.episodes} episodes, ${titles[policy]} · ${summary.successes}/${summary.episodes}`:'No evaluation yet';
  document.getElementById('all-outcomes').textContent=summary?'All '+summary.episodes:'All';
- document.getElementById('wall-caption').textContent=`${shown} episodes shown · ${clips} recordings available. Hover a movie tile to preview; click any tile for details. Thumbnails show verified final states. Episodes without a saved movie show a still image.`;
+ document.getElementById('wall-caption').textContent=`${shown} episodes shown · ${clips} recordings available. Hover a movie tile to preview. Click any tile for the outcome and saved media.`;
  document.getElementById('wall-empty').hidden=shown!==0;
 }
+const dialog=document.getElementById('episode-dialog'), media=dialog.querySelector('.episode-media');
+const video=document.getElementById('episode-video'), image=document.getElementById('episode-image');
+const loading=document.getElementById('episode-loading'), description=document.getElementById('episode-description');
+let activeEpisode=null;
+function describeEpisode(e, summary) {
+ description.textContent=`${summary} ${e.steps.length} decisions · ${e.result.replaceAll('_',' ')}.`;
+}
+function showStill(e, thumbnail=e.thumbnail) {
+ video.pause();video.hidden=true;loading.hidden=true;
+ image.hidden=!thumbnail;media.hidden=!thumbnail;
+ if(thumbnail){image.alt='Verified final state for seed '+e.seed;image.src=thumbnail}
+ else image.removeAttribute('src');
+ describeEpisode(e,thumbnail?'Verified final state.':'No recording or final image is available.');
+}
 function openEpisode(key){
- const e=gallery.episodes[key],dialog=document.getElementById('episode-dialog'),video=document.getElementById('episode-video'),image=document.getElementById('episode-image'),loading=document.getElementById('episode-loading');
- document.querySelectorAll('.episode-tile video').forEach(v=>v.pause());
+ const e=gallery.episodes[key];activeEpisode=e;
+ document.querySelectorAll('.episode-tile video').forEach(clip=>clip.pause());
  document.getElementById('episode-title').textContent=`${titles[e.policy]} / seed ${e.seed} / ${e.success?'Success':'Failure'}`;
- video.pause();video.removeAttribute('src');video.hidden=!e.video;image.hidden=Boolean(e.video);loading.hidden=!e.video;
- if(e.video){video.src=e.video;video.load();video.play().catch(()=>{})}else if(e.thumbnail){image.src=e.thumbnail;image.alt='Verified final state for seed '+e.seed}else{image.removeAttribute('src');image.alt='No thumbnail available'}
- document.getElementById('episode-description').textContent=(e.video?'Recorded playback of the scored action trace.':'No movie was saved. This still image shows the verified final state.')+' '+e.steps.length+' decisions · '+e.result.replaceAll('_',' ')+'.';
- document.getElementById('episode-trace').textContent=e.steps.map((s,i)=>String(i+1).padStart(2,'0')+'  '+JSON.stringify(s.action)+' → '+s.result).join('\\n');
+ document.getElementById('episode-trace').textContent=e.steps.map((s,i)=>String(i+1).padStart(2,'0')+'  '+JSON.stringify(s.action)+' → '+s.result).join('\n');
+ if(e.video){
+  image.hidden=true;media.hidden=false;video.hidden=false;loading.hidden=false;
+  describeEpisode(e,'Recorded playback of the scored action trace.');
+  video.src=e.video;video.load();video.play().catch(()=>{});
+ }else showStill(e);
  dialog.showModal();
 }
 document.querySelectorAll('.episode-tile').forEach(tile=>{
- tile.addEventListener('click',()=>openEpisode(tile.dataset.key));const video=tile.querySelector('video');if(!video)return;
- tile.addEventListener('pointerenter',()=>{if(!matchMedia('(hover:hover)').matches)return;if(!video.src)video.src=video.dataset.src;video.play().then(()=>tile.classList.add('previewing')).catch(()=>{})});
- tile.addEventListener('pointerleave',()=>{video.pause();tile.classList.remove('previewing')});
+ tile.addEventListener('click',()=>openEpisode(tile.dataset.key));
+ const thumbnail=tile.querySelector('img');
+ const onMissingImage=()=>{thumbnail.hidden=true;tile.querySelector('.tile-placeholder').hidden=false};
+ if(thumbnail){
+  thumbnail.addEventListener('error',onMissingImage);
+  if(thumbnail.complete&&!thumbnail.naturalWidth)onMissingImage();
+ }
+ const clip=tile.querySelector('video');if(!clip)return;
+ tile.addEventListener('pointerenter',()=>{if(!matchMedia('(hover:hover)').matches)return;if(!clip.src)clip.src=clip.dataset.src;clip.play().then(()=>tile.classList.add('previewing')).catch(()=>{})});
+ tile.addEventListener('pointerleave',()=>{clip.pause();tile.classList.remove('previewing')});
 });
-const episodeVideo=document.getElementById('episode-video'),loading=document.getElementById('episode-loading');
-for(const event of ['loadstart','waiting'])episodeVideo.addEventListener(event,()=>loading.hidden=false);
-for(const event of ['playing','canplay','error'])episodeVideo.addEventListener(event,()=>loading.hidden=true);
-document.getElementById('episode-dialog').addEventListener('close',()=>{episodeVideo.pause();episodeVideo.removeAttribute('src');episodeVideo.load()});
+for(const event of ['loadstart','waiting'])video.addEventListener(event,()=>{if(activeEpisode&&!video.hidden)loading.hidden=false});
+for(const event of ['playing','canplay'])video.addEventListener(event,()=>loading.hidden=true);
+video.addEventListener('error',()=>{if(activeEpisode&&!video.hidden)showStill(activeEpisode)});
+image.addEventListener('error',()=>{if(activeEpisode&&!image.hidden)showStill(activeEpisode,null)});
+dialog.addEventListener('close',()=>{
+ activeEpisode=null;
+ video.pause();video.removeAttribute('src');video.load();image.removeAttribute('src');
+});
 filterWall();
 """
 
 
+def media_url(root, reference, prefix):
+    if not isinstance(reference, str) or not reference or Path(reference).is_absolute():
+        return None
+    path = (root / reference).resolve()
+    if not path.is_relative_to(root) or not path.is_file():
+        return None
+    return prefix + quote(path.relative_to(root).as_posix())
+
+
 def render_gallery(results, output, experiment=None, method=None):
+    root = output.resolve()
+    prefix = output_url(experiment) + "/" if experiment is not None else ""
     modes = ("expert",) if method == "expert" else ("student", "base", "expert")
     initial = {"expert": "expert", "qwen": "student"}.get(method)
     tiles=[];data={"policies":{key: results[key] for key in modes if key in results},
                    "episodes":{}, "initial":initial}
     for policy in modes:
         for e in read_json(output/"evaluation"/policy/"episodes.json",[]):
-            key=f"{policy}-{e['seed']}";passed=e["success"];thumbnail=e.get("thumbnail");video=e.get("video")
+            key=f"{policy}-{e['seed']}";passed=e["success"]
+            thumbnail = media_url(root, e.get("thumbnail"), prefix)
+            video = media_url(root, e.get("video"), prefix)
             data["episodes"][key]={"policy":policy,"seed":e["seed"],"success":passed,"thumbnail":thumbnail,"video":video,"result":e["final_observation"]["last_result"],"steps":[{"action":s["action"],"result":s["result"]} for s in e["steps"]]}
-            image=f'<img loading="lazy" src="{escape(thumbnail)}" alt="Seed {e["seed"]}, {"success" if passed else "failure"}">' if thumbnail else f'<span class="tile-placeholder">Seed {e["seed"]}</span>'
+            image=f'<img loading="lazy" src="{escape(thumbnail)}" alt="Seed {e["seed"]}, {"success" if passed else "failure"}">' if thumbnail else ''
+            placeholder = f'<span class="tile-placeholder"{" hidden" if thumbnail else ""}>Seed {e["seed"]}</span>'
             movie=f'<video muted loop playsinline preload="none" data-src="{escape(video)}" aria-hidden="true"></video><span class="clip-indicator" aria-hidden="true">▶</span>' if video else ''
-            tiles.append(f'<button class="episode-tile {"success" if passed else "failure"}" data-policy="{policy}" data-success="{str(passed).lower()}" data-key="{key}" data-video="{str(bool(video)).lower()}" aria-label="{policy}, seed {e["seed"]}, {"success" if passed else "failure"}. {"Watch recording" if video else "View final state"}">{image}{movie}<span class="outcome-badge {"ok" if passed else "fail"}" aria-hidden="true">{"✓" if passed else "×"}</span><span class="tile-seed">{e["seed"]}</span></button>')
+            tiles.append(f'<button class="episode-tile {"success" if passed else "failure"}" data-policy="{policy}" data-success="{str(passed).lower()}" data-key="{key}" data-video="{str(bool(video)).lower()}" aria-label="{policy}, seed {e["seed"]}, {"success" if passed else "failure"}. {"Watch recording" if video else "View episode details"}">{placeholder}{image}{movie}<span class="outcome-badge {"ok" if passed else "fail"}" aria-hidden="true">{"✓" if passed else "×"}</span><span class="tile-seed">{e["seed"]}</span></button>')
     controls=[]
     for policy,label in (("student","Trained student"),("base","Untrained baseline"),("expert","Scripted expert")):
         if policy not in modes:

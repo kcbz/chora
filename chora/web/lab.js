@@ -122,6 +122,31 @@ function buttonLabel(button,text,loading){
  if(!label){button.replaceChildren();const spinner=document.createElement('span');spinner.className='spinner';spinner.setAttribute('aria-hidden','true');button.append(spinner);label=document.createElement('span');label.className='button-label';button.append(label)}
  button.querySelector('.spinner').hidden=!loading;label.textContent=text;button.setAttribute('aria-busy',String(loading));
 }
+function supportsQwenTraining(s) {
+ return Boolean(s.experiment && s.experiment.available !== false && s.experiment.physics?.learning_enabled !== false);
+}
+function qwenStatus(s) {
+ if (!s.experiment) return 'Checking Qwen availability…';
+ if (!supportsQwenTraining(s)) return 'This is a scripted trial. Qwen training is unavailable for this scene.';
+ if (!s.adapter_ready) return 'Qwen has not been trained for this scene.';
+ if (!s.model_ready) return 'The Qwen base model is missing. Run the Chora setup to restore it.';
+ return '';
+}
+function renderTrainingShortcut(s) {
+ const visualTraining = method === 'vla' && s.vla?.supported_scene;
+ const qwenTraining = usesSceneControls() && supportsQwenTraining(s);
+ const shortcut = $('training-shortcut');
+ shortcut.hidden = !visualTraining && !qwenTraining;
+ shortcut.disabled = Boolean((method === 'expert' && methodPicker.disabled) || s.switching || pendingExperiment);
+ shortcut.textContent = visualTraining ? 'Training details ↓' : 'Go to training ↓';
+}
+$('training-shortcut').addEventListener('click', () => {
+ if (method === 'expert') selectMethod('qwen');
+ const heading = $('pipeline-title');
+ heading.focus({preventScroll: true});
+ heading.scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+});
+
 function renderViewer(s) {
  const v = s.vla || {};
  const isVisual = method === 'vla';
@@ -130,14 +155,12 @@ function renderViewer(s) {
  const preparing = Boolean(s.switching || (isVisual ? pendingVla || v.phase === 'loading' : pendingRun || ['preparing','loading_policy'].includes(s.phase)));
  const blocked = Boolean(uiJob(s).running || s.switching || pendingExperiment || (isVisual ? s.running : v.running));
  const canRun = isVisual ? Boolean(v.supported_scene && v.ready && v.recommended_id) :
-  method === 'expert' || (method === 'qwen' && s.adapter_ready && s.experiment?.physics?.learning_enabled !== false);
+  method === 'expert' || (method === 'qwen' && !qwenStatus(s));
  const availability = method === 'vlm' ? 'Scene inspection is planned. A vision-language model has yet to be connected.' :
   method === 'planner' ? 'Task planning is planned. A pretrained action model and skills have yet to be connected.' :
   isVisual && !v.supported_scene ? 'VLA currently supports Bowl · Standard platform.' :
   isVisual && !canRun ? (v.unavailable_reason || 'A visual policy is not available for this scene.') :
-  method === 'qwen' && !canRun ? (s.experiment?.physics?.learning_enabled === false ?
-   'This scene is a scripted trial. Its student training is still in development.' :
-   'Train a Qwen student for this scene using the learning pipeline below.') : '';
+  method === 'qwen' ? qwenStatus(s) : '';
  $('method-status').hidden = !availability;
  $('method-status').textContent = availability;
  $('seed-field').hidden = !usesSceneControls() && !canRun && !running;
@@ -174,8 +197,7 @@ function savedSummary(name,s){
  return '';
 }
 function renderPipeline(s){
- const material = s.experiment?.physics?.learning_enabled === false;
- const showStages = !material && usesSceneControls();
+ const showStages = supportsQwenTraining(s) && usesSceneControls();
  const pipeline = document.querySelector('.pipeline');
  pipeline.hidden = (!showStages && method !== 'vla') || !s.experiment;
  $('pipeline-title').textContent = method === 'expert' ? 'Expert verification' : 'Learning pipeline';
@@ -202,7 +224,7 @@ function renderPipeline(s){
   if(determinate){const percentage=Math.max(0,Math.min(100,100*done/total));bar.firstElementChild.style.width=percentage+'%';bar.setAttribute('aria-valuemin','0');bar.setAttribute('aria-valuemax',String(total));bar.setAttribute('aria-valuenow',String(done))}
   else{bar.removeAttribute('aria-valuenow');bar.firstElementChild.style.width='35%'}
   bar.setAttribute('aria-valuetext',progress.message||statusText);
-  const ready=name==='generate'?s.oracle?.success_rate>=.9:name==='curate'?Boolean(s.generation):name==='train'?Boolean(s.curation?.selected_episodes&&s.model_ready&&!s.adapter_ready):name==='evaluate'?s.adapter_ready:true;
+  const ready=name==='generate'?s.oracle?.success_rate>=.9:name==='curate'?Boolean(s.generation):name==='train'?Boolean(s.curation?.selected_episodes&&s.model_ready&&!s.adapter_ready):name==='evaluate'?s.adapter_ready&&s.model_ready:true;
   button.disabled=busy||s.running||pendingRun||!ready;
   let label=running?(current.pending?'Starting…':meta.working+(determinate?` ${done.toLocaleString()} / ${total.toLocaleString()}`:'…')):meta.button+' ↗';
   if(name==='train'&&s.adapter_ready&&!running)label='Student ready';
@@ -232,7 +254,7 @@ function fitPickers() {
   if (!option) continue;
   selectMeasure.font = getComputedStyle(picker).font;
   const spinnerWidth = picker.id === 'experiment-picker' && !$('experiment-loading').hidden ? 24 : 0;
-  const available = picker.parentElement.clientWidth - spinnerWidth;
+  const available = picker.closest('.experiment-fields').clientWidth - spinnerWidth;
   picker.style.width = Math.min(Math.ceil(selectMeasure.measureText(option.textContent).width) + 52, Math.max(0, available)) + 'px';
  }
 }
@@ -431,6 +453,7 @@ function renderEpisode(s) {
 function renderWorkspace(s) {
  syncExperiment(s);
  renderViewer(s);
+ renderTrainingShortcut(s);
  renderPlayback(s);
  renderPipeline(s);
  renderMeasurements(s);

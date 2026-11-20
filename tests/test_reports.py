@@ -31,3 +31,29 @@ def test_gallery_uses_recorded_results_and_escapes_actions(tmp_path,monkeypatch)
         assert 'href="/static/app.css"' in document
         assert 'viewBox="0 0 28 28"' in document
         assert "{{" not in document
+
+
+def test_scoped_gallery_uses_existing_media_from_the_selected_scene(tmp_path):
+    from chora.gallery import render_gallery
+
+    folder = tmp_path / "evaluation/expert"
+    (folder / "thumbs").mkdir(parents=True)
+    (folder / "thumbs/seed_1.jpg").touch()
+    (folder / "seed_1.mp4").touch()
+    episode = {"success": False, "final_observation": {"last_result": "not_placed"}, "steps": []}
+    records = [
+        dict(episode, seed=1, thumbnail="evaluation/expert/thumbs/seed_1.jpg",
+             video="evaluation/expert/seed_1.mp4"),
+        dict(episode, seed=2, thumbnail="evaluation/expert/thumbs/seed_2.jpg"),
+    ]
+    (folder / "episodes.json").write_text(json.dumps(records))
+
+    for scene, prefix in [("so101-bowl", "/outputs"),
+                          ("so101-bowl-low-left", "/outputs/experiments/so101-bowl-low-left")]:
+        html = render_gallery({"expert": {"successes": 0, "episodes": 2}},
+                              tmp_path, experiment=scene, method="expert")
+        data = json.loads(re.search(r'<script id="episode-data" type="application/json">(.*?)</script>',
+                                    html, re.S).group(1))["episodes"]
+        assert data["expert-1"]["thumbnail"] == prefix + "/evaluation/expert/thumbs/seed_1.jpg"
+        assert data["expert-1"]["video"] == prefix + "/evaluation/expert/seed_1.mp4"
+        assert data["expert-2"]["thumbnail"] is None

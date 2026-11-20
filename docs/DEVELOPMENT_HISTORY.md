@@ -201,3 +201,10 @@ or validated real material behavior.
   which results the gallery and reports show.
 - Added status displays for planned visual inspection and skill orchestration.
   Removed the separate visual-policy panel and the stale HTML lab snapshot.
+
+## 2026-11-20 — Make training and saved results easier to find
+
+- Grouped the two lab selectors, added scene-specific Qwen availability, and
+  linked the run controls to the learning pipeline for trainable scenes.
+- Fixed episode media links in scoped galleries by resolving them against the
+  scene's output folder. Missing media leaves the outcome and action trace visible.
