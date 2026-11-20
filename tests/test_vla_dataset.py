@@ -76,3 +76,19 @@ def test_dataset_manifest_tampering_and_overwrite_rejected(recordings, tmp_path)
     file.write_text(json.dumps(data))
     with pytest.raises(ValueError, match="integrity"):
         ChunkDataset(directory, "train")
+
+
+def test_relative_arm_roundtrip_and_train_only_statistics(recordings,tmp_path):
+    from chora.vla.actions import decode_actions
+    directory=prepare([recordings],tmp_path/'relative',action_representation='relative_arm',chunk=4)
+    dataset=ChunkDataset(directory,'train',chunk=4)
+    sample=dataset[3]
+    arrays=dataset.episode_arrays(sample['episode_index'])
+    encoded=sample['targets']*dataset.norm['action_scale']+dataset.norm['action_center']
+    decoded=decode_actions(encoded,arrays['joint_positions'][sample['tick']],'relative_arm')
+    np.testing.assert_allclose(decoded[sample['valid']],arrays['actions'][sample['tick']:sample['tick']+4],atol=1e-6)
+    assert max(np.abs(dataset.norm['action_center'][:5]))<.1
+    # Gripper remains absolute and uses only the two training episodes.
+    assert dataset.norm['action_center'][5]<3
+    with pytest.raises(ValueError,match='Chunk'):
+        ChunkDataset(directory,'train',chunk=16)

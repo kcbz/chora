@@ -9,6 +9,7 @@ import numpy as np
 import torch
 
 from .dataset import ChunkDataset
+from .actions import decode_actions
 from .model import load_checkpoint
 from .train import Batches, feature_files
 
@@ -62,6 +63,9 @@ def run(checkpoint, dataset, output, *, device="mps", windows=8):
             valid = batch["valid"][row]
             pred = normal[row]*scales+centers
             target = batch["targets"][row]*scales+centers
+            reference = data.episode_arrays(sample["episode_index"])["joint_positions"][sample["tick"]]
+            pred = torch.tensor(decode_actions(pred.cpu().numpy(), reference, data.representation),device=device)
+            target = torch.tensor(decode_actions(target.cpu().numpy(), reference, data.representation),device=device)
             report["cases"].append({"seed": sample["seed"], "tick": sample["tick"],
                                     "valid_ticks": int(valid.sum()),
                                     "predicted_joint_targets": pred[valid].cpu().tolist(),

@@ -14,7 +14,7 @@ import torch
 import yaml
 from safetensors.torch import load_file, save_file
 
-from ..common import OUTPUT, ROOT
+from ..common import OUTPUT, ROOT, exclusive_job, job_progress
 from .dataset import ChunkDataset, digest
 from .model import ModelConfig, VisualActionModel, load_backbones, load_checkpoint, preprocess_rgb, save_checkpoint
 
@@ -134,6 +134,7 @@ def restore_training_state(path, optimizer, generator, sampler, signature):
     return meta["step"]
 
 
+@exclusive_job("vla-train")
 def run(dataset, *, steps=300, batch_size=4, overfit_windows=8, output=None, device="auto",
         learning_rate=.0003, seed=42, eval_every=50, resume=None):
     if not 1 <= steps <= 100000 or not 1 <= batch_size <= 16 or not 0 <= overfit_windows <= 1024 or eval_every < 1:
@@ -181,6 +182,7 @@ def run(dataset, *, steps=300, batch_size=4, overfit_windows=8, output=None, dev
         (path / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     write()
     try:
+        job_progress(0,steps,"Loading visual policy encoders…")
         if resume:
             model, text, text_valid, saved = load_checkpoint(resume, device)
             if saved["normalization"] != train.norm or saved["metadata"]["instruction"] != contract["instruction"]:
@@ -200,6 +202,7 @@ def run(dataset, *, steps=300, batch_size=4, overfit_windows=8, output=None, dev
         start_step = restore_training_state(resume, optimizer, noise_rng, sampler, signature) if resume else 0
         if start_step >= steps:
             raise ValueError("Requested total steps must exceed resumed step")
+        job_progress(start_step,steps,"Preparing frozen camera features…")
         train_features = feature_files(train, model, settings, device)
         val_features = feature_files(validation, model, settings, device)
         train_batches, val_batches = Batches(train, train_features, device), Batches(validation, val_features, device)
@@ -223,6 +226,8 @@ def run(dataset, *, steps=300, batch_size=4, overfit_windows=8, output=None, dev
             if not torch.isfinite(loss) or not torch.isfinite(norm):
                 raise RuntimeError("Nonfinite training loss/gradient")
             optimizer.step()
+            if step == start_step+1 or step % 25 == 0 or step == steps:
+                job_progress(step,steps,f"Training visual policy · update {step:,} of {steps:,}")
             row = {"step": step, "flow_loss": float(loss.detach().cpu()), "gradient_norm": float(norm.cpu())}
             with (path / "metrics.jsonl").open("a") as f:
                 f.write(json.dumps(row) + "\n")
@@ -254,6 +259,7 @@ def run(dataset, *, steps=300, batch_size=4, overfit_windows=8, output=None, dev
                       train_mse_ratio=last["train"]["normalized_action_mse"] / initial["normalized_action_mse"],
                       checkpoint_selection="fixed budget final checkpoint; validation not used to fit/select")
         write()
+        job_progress(steps,steps,"Visual policy training finished; closed-loop evaluation is still required.")
         return path
     except BaseException as error:
         report.update(status="interrupted" if isinstance(error, KeyboardInterrupt) else "failed", error=str(error))

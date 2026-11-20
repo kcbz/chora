@@ -9,13 +9,16 @@ from pathlib import Path
 import numpy as np
 
 from .record import PROTOCOL, sha256
+from .actions import REPRESENTATIONS, encode_actions
 
 
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 
 
-def prepare(recordings, output, *, validation_fraction=.2, split_seed=42):
+def prepare(recordings, output, *, validation_fraction=.2, split_seed=42, action_representation="absolute", chunk=16):
+    if action_representation not in REPRESENTATIONS or not isinstance(chunk,int) or not 1 <= chunk <= 64:
+        raise ValueError("Invalid action representation or normalization chunk")
     if not 0 < validation_fraction < 1:
         raise ValueError("Validation fraction must be between zero and one")
     output = Path(output).resolve()
@@ -75,13 +78,19 @@ def prepare(recordings, output, *, validation_fraction=.2, split_seed=42):
             continue
         with np.load((output / episode["path"]).resolve(), allow_pickle=False) as data:
             for key in train_arrays:
-                train_arrays[key].append(data[key] if key == "actions" else data[key][:-1])
+                if key == "actions" and action_representation == "relative_arm":
+                    for tick in range(len(data[key])):
+                        train_arrays[key].append(encode_actions(data[key][tick:tick+chunk],data["joint_positions"][tick],action_representation))
+                else:
+                    train_arrays[key].append(data[key] if key == "actions" else data[key][:-1])
     normalization = {"method": "training episodes only; standard deviation floor 0.01"}
     for key, prefix in (("joint_positions", "position"), ("joint_velocities", "velocity"), ("actions", "action")):
         values = np.concatenate(train_arrays[key])
         normalization[prefix + "_center"] = values.mean(0).tolist()
         normalization[prefix + "_scale"] = np.maximum(values.std(0), .01).tolist()
-    value = {"protocol": "chora-vla-pilot-chunks-v1", "purpose": "development training/overfit; no final-test results",
+    normalization["action_representation"] = action_representation
+    value = {"protocol": "chora-vla-pilot-chunks-v2" if action_representation == "relative_arm" else "chora-vla-pilot-chunks-v1",
+             "normalization_chunk": chunk, "purpose": "development training/overfit; no final-test results",
              "contract": contract, "episodes": episodes, "normalization": normalization,
              "split_seed": split_seed, "validation_fraction": validation_fraction}
     value["fingerprint"] = digest(value)
@@ -97,11 +106,14 @@ class ChunkDataset:
         self.directory = Path(directory).resolve()
         self.manifest = json.loads((self.directory / "dataset.json").read_text())
         payload = {k: v for k, v in self.manifest.items() if k != "fingerprint"}
-        if self.manifest["protocol"] != "chora-vla-pilot-chunks-v1" or digest(payload) != self.manifest["fingerprint"]:
+        if self.manifest["protocol"] not in {"chora-vla-pilot-chunks-v1", "chora-vla-pilot-chunks-v2"} or digest(payload) != self.manifest["fingerprint"]:
             raise ValueError("Dataset manifest integrity mismatch")
         self.chunk, self.history_offset = chunk, history_offset
         self.episodes = [e for e in self.manifest["episodes"] if e["split"] == split]
         self.norm = self.manifest["normalization"]
+        self.representation = self.norm.get("action_representation", "absolute")
+        if self.representation == "relative_arm" and chunk != self.manifest["normalization_chunk"]:
+            raise ValueError("Chunk differs from the relative-action normalization contract")
         self.windows = [(i, tick) for i, episode in enumerate(self.episodes) for tick in range(0, episode["ticks"], stride)]
         self._states = {}
         for e in self.episodes:
@@ -128,7 +140,7 @@ class ChunkDataset:
         n = self.episodes[episode_index]["ticks"]
         valid = np.arange(self.chunk) < n - tick
         targets = np.zeros((self.chunk, 6), dtype=np.float32)
-        actual = arrays["actions"][tick:min(n, tick+self.chunk)]
+        actual = encode_actions(arrays["actions"][tick:min(n, tick+self.chunk)],arrays["joint_positions"][tick],self.representation)
         targets[:len(actual)] = (actual - self.norm["action_center"]) / self.norm["action_scale"]
         q = (arrays["joint_positions"][tick] - self.norm["position_center"]) / self.norm["position_scale"]
         v = (arrays["joint_velocities"][tick] - self.norm["velocity_center"]) / self.norm["velocity_scale"]
@@ -144,8 +156,10 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--validation-fraction", type=float, default=.2)
     parser.add_argument("--split-seed", type=int, default=42)
+    parser.add_argument("--action-representation", choices=sorted(REPRESENTATIONS), default="absolute")
+    parser.add_argument("--chunk", type=int, default=16)
     args = parser.parse_args()
-    print(prepare(args.recordings, args.output, validation_fraction=args.validation_fraction, split_seed=args.split_seed))
+    print(prepare(args.recordings, args.output, validation_fraction=args.validation_fraction, split_seed=args.split_seed, action_representation=args.action_representation, chunk=args.chunk))
 
 
 if __name__ == "__main__":

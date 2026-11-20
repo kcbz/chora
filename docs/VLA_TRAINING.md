@@ -163,3 +163,22 @@ weak joint conditioning and action-sequence averaging, then tested actual bounde
 rollouts. They improved the fit but did not establish successful placement. More
 varied demonstrations and checked recovery examples are next. A low training error
 alone cannot justify scaling to two-arm tiling or claiming a learned bowl skill.
+
+## Relative-arm target format
+
+Dataset preparation now accepts `--action-representation relative_arm`. This
+creates protocol `chora-vla-pilot-chunks-v2` and fits action normalization on
+training windows at the declared chunk length. At each window, the first five
+joint targets are offsets from that window's measured starting joint pose. The
+gripper target remains absolute. At inference, the measured pose is added back
+once for all actions in that chunk before actuator/slew guards are applied.
+
+This is a different supervised target representation, not visual smoothing or
+an alteration of physics. Old v1 datasets and checkpoints keep absolute targets.
+The normalization declares its representation; an unknown representation or
+incompatible chunk length is rejected. Train/validation splitting and masks stay
+unchanged. Both encoders remain frozen in this implementation.
+
+CLI training now participates in the lab's pipeline lock and publishes progress,
+so normal lab actions wait while visual policy training uses the GPU. A training
+run finishing still requires a separate actual rollout evaluation.

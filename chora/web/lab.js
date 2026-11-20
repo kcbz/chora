@@ -62,6 +62,7 @@ viewport.addEventListener('pointerup',endDrag);viewport.addEventListener('pointe
 viewport.addEventListener('wheel',e=>{if(!state.ready)return;e.preventDefault();orbit.distance=Math.max(.22,Math.min(1.8,orbit.distance*Math.exp(e.deltaY*.0012)));scheduleOrbit()},{passive:false});
 
 const JOBS={
+ 'vla-train':{title:'Visual policy training',working:'Training visual policy'},
  check:{title:'Expert check',button:'Run expert check',working:'Checking'},
  generate:{title:'Demonstration collection',button:'Collect demonstrations',working:'Collecting'},
  curate:{title:'Dataset curation',button:'Curate dataset',working:'Curating'},

@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 from collections import OrderedDict, deque
 import json
+import hashlib
 import math
 from pathlib import Path
 import time
@@ -18,6 +19,7 @@ import torch
 
 from ..common import OUTPUT
 from .dataset import ChunkDataset, digest
+from .actions import decode_actions
 from .env import BowlTickEnv
 from .model import load_checkpoint, preprocess_rgb
 from .record import provenance
@@ -114,6 +116,7 @@ class ChunkPolicy:
                 memory, pad = self.model.condition(torch.stack((old, current), 1), self.text, self.text_valid, state)
                 normalized = self.model.sample(memory, pad)[0].cpu().numpy()
             raw = normalized*np.asarray(self.norm["action_scale"])+self.norm["action_center"]
+            raw = decode_actions(raw, obs["joint_positions"], self.norm.get("action_representation", "absolute"))
             if raw.shape != (self.model.cfg.chunk, self.model.cfg.action_dim) or not np.isfinite(raw).all():
                 raise ValueError("Nonfinite or malformed learned action chunk")
             sync(self.device)
@@ -167,7 +170,8 @@ def run(checkpoint, dataset, *, output=None, device="mps", seeds=(20000, 20003),
             temporary.replace(path/"progress.json")
             last_publish[0] = time.monotonic()
         results = []
-        report = {"status": "running", "checkpoint": str(checkpoint), "dataset_fingerprint": data.manifest["fingerprint"],
+        report = {"status": "running", "checkpoint": str(checkpoint),
+                  "checkpoint_sha256": hashlib.sha256((Path(checkpoint)/"model.safetensors").read_bytes()).hexdigest(), "dataset_fingerprint": data.manifest["fingerprint"],
                   "mode": "synchronous development diagnostics; physics waits for inference",
                   "max_ticks": max_ticks, "execute_horizon": execute, "target_slew_limit_rad_s": 3.,
                   "no_expert_fallback": True, "seeds": seeds, "trials": results,
