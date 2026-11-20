@@ -105,8 +105,8 @@ class VLAService:
             if isinstance(seed, bool) or not isinstance(seed, int) or not 20000 <= seed < 30000:
                 raise ValueError('VLA tests use development seeds 20000–29999')
             row = next((r for r in self.candidates() if r['id'] == candidate_id), None)
-            if row is None:
-                raise ValueError('Choose an available VLA checkpoint')
+            if row is None or not row['recommended']:
+                raise ValueError('A working visual policy is not available for this selection')
             python = self.root/'.venv-vla/bin/python'
             if not python.is_file():
                 raise ValueError('Set up the separate VLA environment first; see docs/VLA.md')
@@ -134,12 +134,13 @@ class VLAService:
             if self.running and self.stop_at and time.monotonic()-self.stop_at > 5:
                 self.process.terminate()
             candidates = self.candidates()
-            state = dict(ready=bool(candidates) and (self.root/'.venv-vla/bin/python').is_file(),
-                         candidates=[dict(id=r['id'], label=r['label'],evaluation=r['evaluation']) for r in candidates],
-                         recommended_id=next((r['id'] for r in candidates if r['recommended']),None),
+            chosen=next((r for r in candidates if r['recommended']),None)
+            state = dict(ready=bool(chosen) and (self.root/'.venv-vla/bin/python').is_file(),
+                         candidates=[dict(id=chosen['id'],label='Bowl placement visual policy',evaluation=chosen['evaluation'])] if chosen else [],
+                         recommended_id=chosen['id'] if chosen else None,
                          running=self.running, id=self.run_id, phase='idle', has_frame=False)
             if not state['ready']:
-                state['unavailable_reason'] = 'No local VLA checkpoint or VLA environment is available. See docs/VLA.md.'
+                state['unavailable_reason'] = 'No visual policy has passed the development checks yet.'
             if not self.process:
                 return state
             progress = read(self.directory/'progress.json', {})

@@ -1,4 +1,4 @@
-let vlaPending=false,vlaChoices='',vlaRunId=null,vlaFrameRevision=null,vlaFrameBusy=false;
+let vlaPending=false,vlaRunId=null,vlaFrameRevision=null,vlaFrameBusy=false;
 async function startVla(){
  if(!$('vla-seed').reportValidity())return;
  vlaPending=true;renderVla(state);
@@ -10,22 +10,19 @@ async function startVla(){
 }
 async function stopVla(){try{await post('/api/vla',{operation:'stop'});state.vla={...state.vla,phase:'stopping'};renderVla(state)}catch{}}
 async function renderVla(s){
- const v=s.vla||{},other=Boolean(s.running||s.switching||uiJob(s).running),running=Boolean(v.running||vlaPending);
- const candidates=v.candidates||[],signature=JSON.stringify(candidates);
- if(signature!==vlaChoices){
-  const selected=$('vla-checkpoint').value;vlaChoices=signature;$('vla-checkpoint').replaceChildren();
-  const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent=!candidates.length?'No local VLA checkpoints':v.recommended_id?'Choose a checkpoint':'No usable VLA yet · choose a diagnostic';$('vla-checkpoint').append(placeholder);
-  for(const c of candidates){const o=document.createElement('option');o.value=c.id;o.textContent=c.label;$('vla-checkpoint').append(o)}
-  $('vla-checkpoint').value=candidates.some(c=>c.id===selected)?selected:(v.recommended_id||'');
- }
+ const v=s.vla||{},available=Boolean(v.ready&&v.recommended_id),other=Boolean(s.running||s.switching||uiJob(s).running),running=Boolean(v.running||vlaPending);
+ $('vla-checkpoint').value=v.recommended_id||'';
+ $('vla-workspace').hidden=!available&&!running;
+ $('vla-model').textContent=available?'Bowl placement · Visual policy':'';
+ const tag=$('vla-panel').querySelector('.tag');tag.textContent=available?'Experimental · standard bowl':'In development';
  const supported=Boolean(v.supported_scene);
  $('vla-checkpoint').disabled=running||other||!supported;$('vla-seed').disabled=running||other||!supported;
- $('vla-availability').textContent=!s.vla?'Restart the lab server to enable VLA tests.':!supported?'Select Bowl · Standard platform above to test these checkpoints.':!v.ready?v.unavailable_reason:other?'Finish the current episode or pipeline stage first.':'Development seeds: 20000–29999. These tests do not use final benchmark scenes.';
- $('vla-readiness').textContent=v.recommended_id?'A checkpoint has passed the basic unseen-scene development check. This is still a simulation policy.':'No usable visual policy yet. These checkpoints are diagnostics; failed policies can oscillate without completing the task. The expert and Qwen controls above remain available.';
- $('vla-run').disabled=running||other||!supported||!v.ready||!$('vla-checkpoint').value;
+ $('vla-availability').textContent=!s.vla?'Restart the lab server to enable VLA tests.':!supported?'Select Bowl · Standard platform above to test these checkpoints.':!available?v.unavailable_reason:other?'Finish the current episode or pipeline stage first.':'Development seeds: 20000–29999. These tests do not use final benchmark scenes.';
+ $('vla-readiness').textContent=available?'Test the camera-based bowl placement policy.':'The visual policy is still in development. No working model is available yet.';
+ $('vla-run').disabled=running||other||!supported||!available||!$('vla-checkpoint').value;
  buttonLabel($('vla-run'),running?(v.phase==='stopping'?'Stopping…':v.phase==='running'?'Testing…':'Loading…'):'Test VLA',running);
  $('vla-stop').disabled=!v.running||v.phase==='stopping';$('vla-panel').setAttribute('aria-busy',String(running));
- let message=running?(v.phase==='stopping'?'Stopping the test…':v.phase==='running'?`Running · tick ${v.tick||0} / ${v.max_ticks||240}`:'Loading the visual policy…'):'Choose a checkpoint to test.';
+ let message=running?(v.phase==='stopping'?'Stopping the test…':v.phase==='running'?`Running · tick ${v.tick||0} / ${v.max_ticks||240}`:'Loading the visual policy…'):'Ready to run.';
  if(!running&&v.phase==='stopped')message='Test stopped.';
  if(!running&&v.phase==='failed')message=v.error||'VLA test failed.';
  if(!running&&v.phase==='complete')message=v.success?'Placement completed.':`Placement not completed · ${String(v.outcome||'episode ended').replaceAll('_',' ')}.`;
@@ -38,7 +35,7 @@ async function renderVla(s){
  await refreshVlaFrame(v);
 }
 async function refreshVlaFrame(v){
- if(!v?.has_frame||vlaFrameBusy||(!v.running&&v.frame_revision===vlaFrameRevision))return;
+ if(!v?.has_frame||(!v.running&&!v.recommended_id)||vlaFrameBusy||(!v.running&&v.frame_revision===vlaFrameRevision))return;
   vlaFrameBusy=true;const id=v.id,revision=v.frame_revision;
   try{const response=await fetch('/api/vla/frame.jpg?t='+Date.now());if(!response.ok)return;
    const blob=await response.blob();if(id!==vlaRunId)return;

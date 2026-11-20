@@ -50,8 +50,10 @@ def test_start_uses_fixed_environment_and_rejects_user_paths(tmp_path,monkeypatc
     def spawn(args,**kwargs): calls.append((args,kwargs));return process
     monkeypatch.setattr(subprocess,'Popen',spawn)
     service=VLAService(tmp_path)
+    rows=service.candidates();rows[0]['recommended']=True
+    monkeypatch.setattr(service,'candidates',lambda:rows)
     for invalid in ['../outside','missing']:
-        with pytest.raises(ValueError,match='checkpoint'):service.start(invalid,20003)
+        with pytest.raises(ValueError,match='selection'):service.start(invalid,20003)
     for invalid in [0,True,30000,20003.5]:
         with pytest.raises(ValueError,match='seed'):service.start('dense-pilot',invalid)
     run_id=service.start('dense-pilot',20003)
@@ -161,9 +163,12 @@ def test_recommendation_requires_unseen_successes_and_matching_weights(tmp_path)
     assert service.status()['recommended_id'] is None
     report(range(25000,25010),success=False)
     state=service.status();assert state['recommended_id'] is None
-    assert state['candidates'][0]['label'].startswith('Failed (0/10)')
+    assert state['candidates']==[]
+    assert service.candidates()[0]['label'].startswith('Failed (0/10)')
+    with pytest.raises(ValueError,match='not available'):service.start('dense-pilot',20003)
     report(range(25000,25010))
     assert service.status()['recommended_id']=='dense-pilot'
+    assert service.status()['candidates']==[dict(id='dense-pilot',label='Bowl placement visual policy',evaluation=service.candidates()[0]['evaluation'])]
     file=folder/'report.json';payload=json.loads(file.read_text());payload['execute_horizon']=1;file.write_text(json.dumps(payload))
     assert service.status()['recommended_id'] is None
     payload['execute_horizon']=4;file.write_text(json.dumps(payload))

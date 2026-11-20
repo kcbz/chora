@@ -108,21 +108,14 @@ for expert checks, demonstration collection, curation, training and evaluation i
 in [Experiments](docs/EXPERIMENTS.md). Material prototypes have their learning
 controls disabled until their task-specific pipelines are ready.
 
-### Test the visual VLA
+### Visual policy
 
-1. Select **Bowl · Standard platform** in the scene dropdown.
-2. Scroll to the **VLA development diagnostics** panel below the main simulation.
-3. Choose a checkpoint by its measured development result, keep development seed
-   **20003**, and click **Test VLA**. Failed/untested checkpoints remain available
-   for explicit diagnostics; they are not selected as a usable default.
-4. Watch the scene/wrist camera preview. Use **Stop** to cancel, or **Open run
-   results** to inspect the completed test.
+The **Visual policy** section shows whether a working camera-based controller is
+available. There is currently no working VLA model; it shows **In development**.
+When an evaluated model is available, the section provides its run controls and
+camera preview. Internal training experiments are kept out of the main UI.
 
-VLA tests use the separate `.venv-vla` environment and locally trained weights;
-see [VLA setup](docs/VLA.md). The panel explains when either is unavailable.
-The panel says **No usable VLA yet** until a checkpoint passes the documented
-unseen-scene check. Training completion alone does not qualify. These outcomes
-are separate from Qwen's scores.
+Developer recording, training and diagnostic commands are in [VLA development](docs/VLA.md).
 After updating server code, stop the server with Ctrl-C and run `serve` again.
 
 ## Testing

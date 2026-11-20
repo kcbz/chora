@@ -1,13 +1,13 @@
 <section class="card vla-panel" id="vla-panel" aria-labelledby="vla-heading">
-  <div class="sectionhead"><h2 id="vla-heading">VLA development diagnostics</h2><span class="tag">Experimental · standard bowl</span></div>
-  <p class="small" id="vla-readiness">No usable visual policy yet. These checkpoints are diagnostics; failed policies can oscillate without completing the task.</p>
-  <div class="vla-layout">
+  <div class="sectionhead"><h2 id="vla-heading">Visual policy</h2><span class="tag">In development</span></div>
+  <p class="small" id="vla-readiness">The visual policy is still in development. No working model is available yet.</p>
+  <div class="vla-layout" id="vla-workspace" hidden>
     <div class="vla-controls">
-      <label for="vla-checkpoint">Checkpoint</label><select id="vla-checkpoint" onchange="renderVla(state)"><option value="">Loading local checkpoints…</option></select>
+      <input id="vla-checkpoint" type="hidden"><p id="vla-model" class="small"></p>
       <label for="vla-seed">Development scene seed</label><input id="vla-seed" type="number" min="20000" max="29999" step="1" value="20003">
       <p class="small" id="vla-availability"></p>
       <div class="buttons"><button class="primary" id="vla-run" type="button" onclick="startVla()" disabled>Test VLA</button><button class="secondary" id="vla-stop" type="button" onclick="stopVla()" disabled>Stop</button></div>
-      <p id="vla-status" class="result" role="status" aria-live="polite">Choose a checkpoint to test.</p>
+      <p id="vla-status" class="result" role="status" aria-live="polite"></p>
       <p id="vla-detail" class="small"></p><a id="vla-report" class="small" hidden>Open run results ↗</a>
     </div>
     <div class="vla-preview">

@@ -181,3 +181,14 @@ or validated real material behavior.
 - Kept all generated results separate from the working Qwen baseline. Serialized
   CLI evaluation with lab GPU jobs and exposed its real progress/outcomes.
   See [VLA_FAILURE_ANALYSIS.md](VLA_FAILURE_ANALYSIS.md) for evidence and limits.
+
+## 2026-11-20 — Remove internal experiments from the product interface
+
+- Removed the dropdown of overfit/conditioning/action-order training runs from
+  the main UI and stopped returning unqualified runs as model choices there.
+- The Visual policy section now shows a compact In development status while no
+  model qualifies. Failed experiment files remain available to developer CLI
+  tools and documentation, without occupying a product model picker.
+- Restricted UI execution to the single qualifying model; direct requests cannot
+  launch a failed diagnostic checkpoint. This does not change the failed VLA's
+  task performance or claim a working controller.

@@ -149,41 +149,27 @@ cover conditioning fixes and bounded development rollouts. More varied training
 and recovery examples are needed; a competent controller and delay-aware runner
 are not yet established.
 
-## Test from the browser
+## Visual policy in the browser
 
-Start the normal lab with `.venv/bin/python -m chora serve` and open
-[http://127.0.0.1:8765/](http://127.0.0.1:8765/). Select **Bowl · Standard platform**,
-then use the **VLA development diagnostics** panel below the main simulation. Choose a discovered
-checkpoint, set a development seed in 20000..29999 and click **Test VLA**.
-No failed or untested checkpoint is selected as a usable default. A recommended
-default requires at least ten distinct scenes outside that dataset's training and
-validation episodes, at least 80% placement success and no collisions in those
-trials. Reported weight hashes must match the checkpoint. This is a basic simulation
-development check, not a final benchmark or physical validation.
+The lab's **Visual policy** section presents one evaluated model when available.
+It does not expose the training-run directory as a checkpoint picker. Without a
+qualifying model it displays **In development** and a plain unavailable status;
+seed inputs, run controls and empty camera panes are hidden.
 
-The server launches one bounded synchronous episode in `.venv-vla`, showing live
-scene/wrist views and progress, inference timing and the actual outcome. **Stop**
-requests cancellation; **Open run results** links the saved report. Viewer orbit
-and playback-speed controls belong to the separate main simulation, not these
-fixed policy-camera views. Test results do not update the Qwen benchmark scores.
+A model must satisfy the basic development check: at least ten distinct scenes
+outside the dataset's train/validation episodes, at least 80% placement success,
+no collisions, matching weight hashes and the deployed execution horizon. This
+is a simulation development criterion, not physical validation. The current
+replacement scored 0/10, so no model is exposed for UI execution. Browser requests
+cannot launch an unqualified checkpoint, even if its ID is supplied directly.
 
-Only completed local training checkpoints with matching datasets appear; arbitrary
-paths cannot be supplied through the browser. Missing dependencies/checkpoints or
-unsupported scenes disable testing with an explanation. Concurrent live episodes,
-scene switching and pipeline jobs are blocked during a VLA test. Source/runtime
-provenance and all existing action guards still apply. No expert fallback is used.
+Training runs and failed diagnostics remain in local outputs and developer CLI
+commands. Their names (such as overfit, joint conditioning and action order)
+describe internal experiments, not robot tasks, scenes or usable model choices.
+See [failure analysis](VLA_FAILURE_ANALYSIS.md) for the actual results. The expert
+and Qwen baseline remain in the main controls.
 
-UI runs live under `outputs/vla/ui-runs/`, with atomic camera/progress snapshots,
-the regular report/episode traces and a sibling process log. This is inference
-and inspection UI, not a visual-policy data collection/training interface.
-Restart an already-running lab after updating server code.
-
-Failed checkpoints are labelled with their actual success counts. Repeated runs
-of one seed do not count as independent scenes; stopped runs are excluded. Without
-a qualifying checkpoint, the UI says **No usable VLA yet** and diagnostics require
-an explicit checkpoint choice. The expert and Qwen baseline remain available in
-the main controls. These defaults address the observed oscillating two-demo pilot.
-
-The reported shaking and the subsequent 50-demonstration replacement are documented
-in [failure analysis](VLA_FAILURE_ANALYSIS.md). The replacement still scored 0/10
-on its ten-scene development check and is not a usable default.
+When a qualifying model exists, run the normal lab with
+`.venv/bin/python -m chora serve`, select the standard bowl scene, and use its
+single visual-policy run control. Live scene/wrist frames, Stop and outcome
+reporting remain supported. Restart the server after updating backend code.

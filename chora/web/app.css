@@ -57,3 +57,5 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 .vla-camera{width:100%;min-width:0}.vla-camera img{min-width:0}@media(max-width:700px){.vla-camera{min-height:0}}
 
 @media(max-width:700px){.vla-panel .sectionhead{flex-wrap:wrap}}
+
+#vla-workspace[hidden]{display:none}.vla-panel:has(#vla-workspace[hidden])>.small{margin-bottom:0}
