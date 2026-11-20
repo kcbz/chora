@@ -63,6 +63,8 @@ viewport.addEventListener('wheel',e=>{if(!state.ready)return;e.preventDefault();
 
 const JOBS={
  'vla-train':{title:'Visual policy training',working:'Training visual policy'},
+ 'vla-test':{title:'Visual policy test',working:'Testing visual policy'},
+ 'vla-evaluate':{title:'Visual policy evaluation',working:'Evaluating visual policy'},
  check:{title:'Expert check',button:'Run expert check',working:'Checking'},
  generate:{title:'Demonstration collection',button:'Collect demonstrations',working:'Collecting'},
  curate:{title:'Dataset curation',button:'Curate dataset',working:'Curating'},

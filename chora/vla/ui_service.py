@@ -35,7 +35,7 @@ class VLAService:
         for file in sorted(files, key=lambda p:p.stat().st_mtime):
             report = read(file, {})
             checkpoint = report.get('checkpoint')
-            if report.get('status') != 'complete' or not isinstance(checkpoint,str):
+            if report.get('status') != 'complete' or not isinstance(checkpoint,str) or report.get('execute_horizon',4) != 4:
                 continue
             checkpoint = str((self.root/checkpoint).resolve())
             for trial in report.get('trials',[]):

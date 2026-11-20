@@ -164,5 +164,9 @@ def test_recommendation_requires_unseen_successes_and_matching_weights(tmp_path)
     assert state['candidates'][0]['label'].startswith('Failed (0/10)')
     report(range(25000,25010))
     assert service.status()['recommended_id']=='dense-pilot'
+    file=folder/'report.json';payload=json.loads(file.read_text());payload['execute_horizon']=1;file.write_text(json.dumps(payload))
+    assert service.status()['recommended_id'] is None
+    payload['execute_horizon']=4;file.write_text(json.dumps(payload))
+    assert service.status()['recommended_id']=='dense-pilot'
     (checkpoint/'model.safetensors').write_bytes(b'changed weights')
     assert service.status()['recommended_id'] is None

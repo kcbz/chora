@@ -17,7 +17,7 @@ import uuid
 import numpy as np
 import torch
 
-from ..common import OUTPUT
+from ..common import OUTPUT, exclusive_job, job_progress
 from .dataset import ChunkDataset, digest
 from .actions import decode_actions
 from .env import BowlTickEnv
@@ -132,7 +132,7 @@ class ChunkPolicy:
         return action
 
 
-def run(checkpoint, dataset, *, output=None, device="mps", seeds=(20000, 20003), max_ticks=240, execute=4, ui_progress=False):
+def run(checkpoint, dataset, *, output=None, device="mps", seeds=(20000, 20003), max_ticks=240, execute=4, ui_progress=False, job_tracking=False):
     seeds = list(seeds)
     if not 1 <= len(seeds) <= 10 or any(not 20000 <= seed < 30000 for seed in seeds):
         raise ValueError("Diagnostics use 1..10 development seeds in 20000..29999")
@@ -181,6 +181,7 @@ def run(checkpoint, dataset, *, output=None, device="mps", seeds=(20000, 20003),
         write()
         try:
             for seed in seeds:
+                if job_tracking:job_progress(len(results),len(seeds),f"Testing visual policy · seed {seed} ({len(results)+1}/{len(seeds)})")
                 obs = env.reset(seed)
                 policy.reset()
                 publish_ui(obs, "running", force=True)
@@ -224,6 +225,7 @@ def run(checkpoint, dataset, *, output=None, device="mps", seeds=(20000, 20003),
                 print(f"Learned rollout {seed}: {trial['reason']}, {trial['ticks']} ticks, "
                       f"slew interventions {trial['slew_limited_scalars']}", flush=True)
             report.update(status="complete", successes=sum(e["success"] for e in results))
+            if job_tracking:job_progress(len(results),len(seeds),f"Visual policy test complete · {report['successes']}/{len(results)} placements")
             write()
         except BaseException as error:
             report.update(status="failed", error=str(error))
@@ -244,7 +246,10 @@ def main():
     parser.add_argument("--max-ticks", type=int, default=240)
     parser.add_argument("--execute", type=int, default=4)
     parser.add_argument("--ui-progress", action="store_true", help="Publish atomic camera/progress files for the local lab")
-    print(run(**vars(parser.parse_args())))
+    args=vars(parser.parse_args())
+    args["job_tracking"]=True
+    run_job=exclusive_job("vla-test" if args["ui_progress"] else "vla-evaluate")(run)
+    print(run_job(**args))
 
 
 if __name__ == "__main__":
