@@ -14,6 +14,7 @@ dependencies = ["mujoco>=3.3,<4.1", "numpy", "scipy", "pyyaml", "imageio", "imag
 [project.optional-dependencies]
 train = ["mlx-lm[train]>=0.32,<0.33; sys_platform == 'darwin'"]
 dev = ["pytest>=8"]
+vla = ["torch>=2.15,<2.16", "transformers==5.23.0", "safetensors>=0.8,<0.9"]
 
 [project.scripts]
 chora = "chora.cli:main"

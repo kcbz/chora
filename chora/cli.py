@@ -39,6 +39,14 @@ def main():
     p.add_argument("--policy",choices=["all","expert","base","student"],default="all")
     p = sub.add_parser("serve",help="Open the local robot learning lab")
     p.add_argument("--port",type=int,default=8765)
+    p = sub.add_parser("vla-record",help="Record fixed-tick visual expert pilot episodes")
+    p.add_argument("--episodes",type=int,default=3)
+    p.add_argument("--seed",type=int,default=20000)
+    p.add_argument("--output",help="New run directory; existing directories are never overwritten")
+    p.add_argument("--image-size",type=int,default=224)
+    p.add_argument("--state-only",action="store_true",help="Physics diagnostic only; excludes training images")
+    p = sub.add_parser("vla-replay",help="Verify a tick recording against its full physics trajectory")
+    p.add_argument("episode",help="Path to an episode NPZ file")
     args = parser.parse_args()
     if args.experiment:
         import os
@@ -48,7 +56,14 @@ def main():
         parser.error("This deformable-material trial is not a validated learning benchmark. Run it in the lab; scoring/training is unavailable.")
     if args.command=="expert" and config().get("physics",{}).get("learning_enabled") is False and not (args.live or args.record):
         parser.error("This is a material trial, not a scored expert check. Use the lab or expert --record.")
-    if args.command=="doctor":
+    if args.command=="vla-record":
+        from .vla.record import collect
+        print(collect(episodes=args.episodes,seed_start=args.seed,output=args.output,
+                      images=not args.state_only,image_size=args.image_size))
+    elif args.command=="vla-replay":
+        from .vla.record import replay
+        print(json.dumps(replay(args.episode),indent=2))
+    elif args.command=="doctor":
         import importlib.metadata
         import platform
         import sys

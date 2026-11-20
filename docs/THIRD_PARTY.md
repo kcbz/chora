@@ -74,3 +74,25 @@ Manufacturer reference PDFs are not bundled or relicensed. Their source URLs,
 checksums and interpreted material records remain in the repository; optional
 local retrieval is documented in docs/ASSETS.md. Large runtime tiling textures
 are likewise retrieved with checksum verification rather than stored in Git.
+
+## Visual policy encoders and runtime
+
+- **DINOv2-S**: Meta/Hugging Face `facebook/dinov2-small`, revision
+  `ed25f3a31f01632728cabb09d1542f84ab7b0056`. The
+  [model card](https://huggingface.co/facebook/dinov2-small) declares Apache-2.0.
+  Retrieved on demand through Transformers; weights remain in the ignored cache.
+- **CLIP ViT-B/32 text encoder**: OpenAI `openai/clip-vit-base-patch32`, revision
+  `3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268`. Sources:
+  [model repository](https://huggingface.co/openai/clip-vit-base-patch32) and
+  [OpenAI CLIP MIT license](https://github.com/openai/CLIP/blob/main/LICENSE),
+  copyright 2021 OpenAI. The text portion is loaded; unused vision tensors in
+  the upstream combined checkpoint are not part of Chora's CLIP text model.
+- **Transformers** (Apache-2.0), **PyTorch** (BSD-style) and **safetensors**
+  (Apache-2.0) are optional VLA runtime dependencies, installed into a separate
+  environment with their upstream distribution notices. Original model weights,
+  generated checkpoints and environments are not bundled in Chora Git history.
+
+The Chora VLA implementation was independently written using published methods
+and these upstream libraries. The unlicensed `distill_frontier` repository is
+reference material; none of its source or trained weights was imported. Its
+reported task success and RTX 4090 timings are not Chora results.

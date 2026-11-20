@@ -37,7 +37,7 @@ def validate_action(action):
     return action
 
 
-def build_model(cfg):
+def build_model(cfg, *, policy_cameras=False):
     source = ROOT / "assets/menagerie/robotstudio_so101/so101.xml"
     if not source.exists():
         raise FileNotFoundError("Official SO-101 assets missing. Run ./setup.sh")
@@ -109,6 +109,10 @@ def build_model(cfg):
     y = np.cross(z,x)
     w.add_camera(name="front", pos=front, xyaxes=np.r_[x,y], fovy=42)
     w.add_camera(name="top", pos=[.13,0,.66], xyaxes=[1,0,0,0,1,0], fovy=48)
+    if policy_cameras:
+        # Optical axis follows the gripper toward its TCP; camera has no mass/contact.
+        s.body("gripper").add_camera(name="wrist", pos=[0, -.045, -.015],
+                                      xyaxes=[1, 0, 0, 0, 1, 0], fovy=70)
     model = s.compile()
     model.vis.global_.offwidth = 1280
     model.vis.global_.offheight = 960
@@ -116,7 +120,7 @@ def build_model(cfg):
 
 
 class Simulation:
-    def __init__(self, cfg=None):
+    def __init__(self, cfg=None, *, policy_cameras=False):
         full_cfg=cfg or config()
         if full_cfg.get("experiment",{}).get("robot","so101")!="so101":
             raise ValueError("This robot requires its own simulation/controller adapter")
@@ -126,7 +130,7 @@ class Simulation:
         self.object_kind=self.cfg.get("object_kind","bowl")
         self.object_rest_height=.002 if self.object_kind=="bowl" else .008 if self.object_kind=="part" else .009
         self.object_radius=BOWL_RADIUS if self.object_kind=="bowl" else math.sqrt(2)*self.object_rest_height
-        self.model = build_model(self.cfg)
+        self.model = build_model(self.cfg, policy_cameras=policy_cameras)
         self.data = mujoco.MjData(self.model)
         self.ik_data = mujoco.MjData(self.model)
         self.tcp_id = self.model.site("tcp").id

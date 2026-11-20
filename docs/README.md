@@ -2,6 +2,11 @@
 
 The [project README](../README.md) covers setup, usage, testing and authors.
 
+- [VLA integration plan](VLA_INTEGRATION_PLAN.md): camera-based policies, M3 feasibility, latency evaluation and two-arm tiling milestones.
+- [VLA development](VLA.md): fixed-tick camera demonstrations, recording format and verified replay.
+- [VLA M3 feasibility](VLA_M3_FEASIBILITY.md): neural model smoke tests, inference/camera timings and memory measurements.
+- [VLA pilot training](VLA_TRAINING.md): episode splits, action chunks, frozen feature caching, training and resume.
+- [VLA policy diagnostics](VLA_POLICY_DIAGNOSTICS.md): joint/sequence conditioning fixes and actual bounded rollout results.
 - [Experiments](EXPERIMENTS.md): learning commands, protocols, outputs and developer reference.
 - [Development history](DEVELOPMENT_HISTORY.md): changes, milestones and historical results.
 - [Assets](ASSETS.md): downloads, checksums, omitted assets and wheel/workspace setup.

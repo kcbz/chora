@@ -75,3 +75,81 @@ have a trained student, cured bond, grout finishing or tile-fracture model.
 Physical calibration is deferred. Earlier demonstrations, visual improvements
 and simulated task success must not be described as evidence of hardware safety
 or validated real material behavior.
+
+## 2026-11-19 — Visual policy recording foundation
+
+- Added an independently written fixed-tick SO-101 adapter, ideal scene/wrist policy
+  cameras, bounded named joint targets and an expert that executes IK references
+  at 25 Hz. The Qwen macro pipeline and saved baseline were retained.
+- Added isolated development-pilot recording with N actions/N+1 observations,
+  timestamps, source/runtime/config and camera provenance, checksums and exact
+  joint-trajectory/final-state physics replay. Student observations exclude bowl
+  and target coordinates; expert and scorer can still access them.
+- The initial 224-pixel pilot completed 3/3 development episodes (seeds 20000–20002)
+  with successful placement and verified replay. This is a recording-path check,
+  not a trained VLA result or a held-out success estimate.
+- Verification: 37 focused non-rendering checks passed with five opt-in checks
+  skipped; the simulation/VLA suite with graphics enabled passed all 30 checks.
+  Recording with cameras and without cameras produced identical trajectories.
+- Neural VLA implementation, M3 model performance measurements, training and lab
+  integration remain subsequent milestones. No reference-repository code or
+  weights were imported. See [VLA.md](VLA.md).
+
+## 2026-11-19 — Neural VLA and M3 feasibility
+
+- Added a separate pinned PyTorch environment and independently implemented 39.2M
+  visual policy: frozen DINOv2-S, cached CLIP text, multimodal fusion and a
+  flow-matching action-chunk decoder. No reference-repository code was copied.
+- Verified offline model contracts, finite MPS gradients and safe checkpoint
+  save/load with identical predictions. The original MLX environment remains
+  separate. Three training updates are only a compatibility smoke test.
+- On Apple M3, warm four-step inference with earlier-image features cached measured
+  33.1 ms median; one-step inference 25.7 ms. Recomputing history took 52.6 ms.
+  Live two-camera capture plus four-step inference took 60.3 ms, exceeding a
+  40 ms tick. All figures are batch one, fp32, 50 repeated observations per setting.
+- These measurements support proceeding with dataset/trainer development, not a
+  claim of trained task success or a proven real-time closed-loop system.
+  Details: [VLA_M3_FEASIBILITY.md](VLA_M3_FEASIBILITY.md).
+
+## 2026-11-19 — VLA pilot dataset and trainer
+
+- Added whole-episode training/validation splitting before chunking, training-only
+  normalization, reset-local camera history and masked action-chunk tails. Source
+  checksums and dataset fingerprints protect the saved data contract.
+- Added a frozen-vision feature cache and flow-matching trainer with per-update
+  diagnostics, validation action errors, safe checkpoints and optimizer/sampler/RNG
+  resume. Existing Qwen datasets, checkpoints and benchmark outputs were retained.
+- Verified an actual M3 resume from update 250 to 300: all model, optimizer and RNG
+  tensors matched the uninterrupted run exactly in that test. Nine focused data,
+  optimizer and model checks passed; the combined VLA/simulation suite passed
+  36 checks with three graphics checks skipped.
+- A single recorded action chunk reduced normalized prediction error by 97.8%
+  over 300 updates. Eight-window training improved initially but plateaued by
+  1000 updates while validation error worsened. This is not a successful learned
+  bowl controller or a multi-window overfit result; no learned rollout was scored.
+  Measurements and next diagnostics are in [VLA_TRAINING.md](VLA_TRAINING.md).
+
+## 2026-11-19 — VLA conditioning and actual learned rollouts
+
+- Diagnosed weak use of joint state and nearly constant predictions across each
+  action chunk. Added explicit joint-state broadcast and fixed sinusoidal action
+  positions, retaining legacy checkpoint behavior through default-false flags.
+- At a matched 1000-update eight-window budget, normalized training action MSE
+  decreased from 0.1361 to 0.01664. Predicted within-chunk motion recovered; this
+  offline improvement did not establish successful robot control.
+- Added a bounded synchronous learned-policy runner with timestamped history and
+  action queues, logged actuator/slew limits, invalid-output stops, provenance
+  checks and actual camera/state traces. It has no expert fallback and is not
+  asynchronous or delay-aware. The same guarded expert completes both tested
+  development scenes.
+- Sparse learned checkpoints stalled or collided. Training on all 263 windows
+  from the two pilot demonstrations eliminated collisions in the two checked
+  scenes but still completed 0/2 placements, with either four-tick or every-tick
+  replanning. Recorded videos show the actual unsuccessful learned behavior.
+- Verified exact initial runtime/recorded joint alignment and first-prediction
+  agreement within 7.5e-8 rad. The focused VLA/simulation suite passed 47 tests
+  with three opt-in graphics tests skipped. Model/optimizer/task artifacts from
+  the original Qwen baseline remain separate.
+- Updated M3 measurements and detailed limitations are recorded in
+  [VLA_POLICY_DIAGNOSTICS.md](VLA_POLICY_DIAGNOSTICS.md). Broader demonstrations
+  and checked recovery examples remain next; no competent VLA policy is claimed.
