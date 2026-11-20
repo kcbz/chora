@@ -183,3 +183,7 @@ of one seed do not count as independent scenes; stopped runs are excluded. Witho
 a qualifying checkpoint, the UI says **No usable VLA yet** and diagnostics require
 an explicit checkpoint choice. The expert and Qwen baseline remain available in
 the main controls. These defaults address the observed oscillating two-demo pilot.
+
+The reported shaking and the subsequent 50-demonstration replacement are documented
+in [failure analysis](VLA_FAILURE_ANALYSIS.md). The replacement still scored 0/10
+on its ten-scene development check and is not a usable default.

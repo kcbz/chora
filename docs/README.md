@@ -6,6 +6,7 @@ The [project README](../README.md) covers setup, usage, testing and authors.
 - [VLA development](VLA.md): fixed-tick camera demonstrations, recording format and verified replay.
 - [VLA M3 feasibility](VLA_M3_FEASIBILITY.md): neural model smoke tests, inference/camera timings and memory measurements.
 - [VLA pilot training](VLA_TRAINING.md): episode splits, action chunks, frozen feature caching, training and resume.
+- [VLA failed-pilot analysis](VLA_FAILURE_ANALYSIS.md): reported oscillation, replacement experiment and actual failed task results.
 - [VLA policy diagnostics](VLA_POLICY_DIAGNOSTICS.md): joint/sequence conditioning fixes and actual bounded rollout results.
 - [Development workflow](CONTRIBUTING.md): task-sized commits, relevant checks and pushing completed work.
 - [Experiments](EXPERIMENTS.md): learning commands, protocols, outputs and developer reference.

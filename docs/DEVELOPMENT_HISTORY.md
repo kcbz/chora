@@ -167,3 +167,17 @@ or validated real material behavior.
   the UI truthfully reported unsuccessful placement at the time limit. Existing
   Qwen scores and control paths remain separate. Visual data/training commands
   remain CLI-only, and no successful VLA placement is claimed.
+
+## 2026-11-20 — Failed-pilot correction and 50-demonstration check
+
+- Investigated the reported shaking: raw learned targets changed abruptly between
+  replans, and the two-demo policy never commanded its gripper closed in that run.
+  Removed failed/untested checkpoints from automatic default selection and added
+  score labels tied to unseen-scene, weight and execution-setting evidence.
+- Collected 50 successful expert episodes, split 40/10, introduced versioned
+  relative-arm targets and trained a bounded 3000-update replacement. It still
+  completed 0/10 development placements, plus 0/1 on the user's seed; every-tick
+  replanning scored 0/3 on an overlapping subset. This did not fix the controller.
+- Kept all generated results separate from the working Qwen baseline. Serialized
+  CLI evaluation with lab GPU jobs and exposed its real progress/outcomes.
+  See [VLA_FAILURE_ANALYSIS.md](VLA_FAILURE_ANALYSIS.md) for evidence and limits.
