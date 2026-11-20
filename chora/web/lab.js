@@ -139,6 +139,15 @@ async function job(name){
  catch(error){pendingJob=null;requestError={name,status:'failed',running:false,error:error.message};renderPipeline(state);renderViewer(state)}
 }
 let experimentCatalog=[],pendingExperiment=null;
+const selectMeasure=document.createElement('canvas').getContext('2d');
+function fitScenePicker(){
+ const picker=$('experiment-picker'),option=picker.selectedOptions[0];if(!option)return;
+ selectMeasure.font=getComputedStyle(picker).font;
+ const available=picker.parentElement.clientWidth-($('experiment-loading').hidden?0:24);
+ picker.style.width=Math.min(Math.ceil(selectMeasure.measureText(option.textContent).width)+52,Math.max(120,available))+'px';
+}
+addEventListener('resize',fitScenePicker);
+document.fonts?.ready.then(fitScenePicker);
 let requestedExperiment=new URLSearchParams(location.search).get('experiment');
 async function loadExperimentCatalog(){
  const r=await fetch('/api/experiments');if(!r.ok)throw Error('Could not load experiments');
@@ -146,6 +155,7 @@ async function loadExperimentCatalog(){
  const picker=$('experiment-picker');picker.replaceChildren();
  for(const item of experimentCatalog){const option=document.createElement('option');option.value=item.id;option.textContent=item.name+(item.available===false?' · asset unavailable':'');option.disabled=item.available===false;option.title=item.unavailable_reason||'';picker.append(option)}
  picker.value=state.experiment?.id||data.active;
+ fitScenePicker();
 }
 function syncExperiment(s){
  if(!s.experiment)return;
@@ -155,6 +165,7 @@ function syncExperiment(s){
  if(s.error&&!s.switching)pendingExperiment=null;
  const switching=Boolean(s.switching||pendingExperiment),pipeline=Boolean(uiJob(s).running);
  $('experiment-picker').value=pendingExperiment||s.experiment.id;
+ fitScenePicker();
  $('experiment-picker').disabled=switching||pipeline||s.running;
  $('experiment-loading').hidden=!switching;document.querySelector('.experiment-bar').setAttribute('aria-busy',String(switching));
  $('experiment-note').textContent=switching?'Loading experiment…':s.experiment.description;$('task-instructions').textContent=s.experiment.instructions;
