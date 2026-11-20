@@ -60,7 +60,7 @@ Physical calibration is **not** a prerequisite for these simulation-only stages.
 ## Open and reproduce
 
 - Live workbench: `http://127.0.0.1:8765/materials/tiling`
-- Native cleanup scene: `http://127.0.0.1:8765/?experiment=fr3-duo-tile-wipe`
+- Historical cleanup trial: reproduce the recording with the command below.
 - Machine-readable record/reference sequence: `outputs/tiling_materials/data.json`
 - Assumed age sweep: `outputs/tiling_materials/assumed_model_age_sweep.csv`
 

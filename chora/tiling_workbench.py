@@ -38,8 +38,8 @@ def render():
     seq=reference_panel()
     content='''<main><div class="material-intro"><div class="eyebrow">Coherence / Tiling</div><h1>Materials, with provenance.</h1>
 <p>A simulation-only baseline for a 2 × 2 ceramic-tile panel. Manufacturer facts and model choices are shown separately. Physical calibration is not required to explore this version.</p>
-<p>The linked robot scene is a prepared tile-holding and grout-cleanup subtask. Full floor/wall installation and tile fracture are not implemented.</p>
-<div class="page-actions"><a href="/?experiment=fr3-duo-tile-wipe">Open two-arm cleanup scene ↗</a> · <a href="/outputs/experiments/fr3-duo-tile-wipe/experiment_report.html">Recorded trial ↗</a></div></div>
+<p>In the lab, two arms apply adhesive and bed four tiles in a floor panel.</p>
+<div class="page-actions"><a href="/?experiment=fr3-tile-installation">Open two-arm tiling scene ↗</a></div></div>
 <section class="card" style="padding:24px"><h2>Explore the material model</h2><p class="material-note">At a fixed 21°C baseline. Each paste has its own clock; this comparison sets both to the selected batch age. Viscosity and squeeze force are assumed constitutive-model predictions, not manufacturer measurements.</p>
 <form id="material-controls" class="material-controls">
 <label>Batch age (seconds)<input name="age_s" type="number" min="0" max="172800" value="600" step="60"></label>
@@ -50,4 +50,4 @@ def render():
 <p class="material-note">The published 800 lbf bending result is not a universal breaking-force threshold. Tile mass is estimated from an assumed 2,200 kg/m³ density. Foot-traffic DCOF is not used as robot contact friction.</p></section>
 <div class="material-grid">'''+''.join(cards)+'''</div>
 <section class="card" style="padding:24px"><h2>2 × 2 panel material sequence</h2><p class="material-note">Numerical accounting reference: spread and bed four tiles, advance the adhesive clock, mix fresh grout, and fill the joints. This is not a robot rollout. Coverage is a volume-based upper bound; spatial wetting, voids and wall slip remain unevaluated.</p><pre style="white-space:pre-wrap">'''+escape(json.dumps(seq,indent=2))+'''</pre></section></main>'''
-    return page('Tiling material workbench',content,'reports',CSS,SCRIPT,experiment='fr3-duo-tile-wipe')
+    return page('Tiling material workbench',content,'reports',CSS,SCRIPT,experiment='fr3-tile-installation')

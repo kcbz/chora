@@ -12,7 +12,7 @@ import yaml
 
 from .paths import WORKSPACE_ROOT as ROOT
 DEFAULT="so101-bowl"
-FIXED_SCENES=(DEFAULT,"so101-bowl-low-left","so101-bowl-high-right","ur10e-hammer","fr3-cut-apple","fr3-cut-tomato","fr3-cut-banana","fr3-duo-tile-wipe","fr3-tile-installation")
+FIXED_SCENES=(DEFAULT,"so101-bowl-low-left","so101-bowl-high-right","ur10e-hammer","fr3-cut-apple","fr3-cut-tomato","fr3-cut-banana","fr3-tile-installation")
 PRESETS=ROOT/"configs/experiments"
 TASKS={
     "tile_adhesive_bedding":{"name":"Tile · Adhesive and bedding","object":"tile","instructions":"Arm B meters and combs each adhesive patch while arm A acquires and lifts its tile on the same physics timeline. Local clearance permits placement; the applicator parks after its final patch. A spatial reduced mortar layer supplies contact loads, redistributes ridge volume and tracks squeeze-out. This is an assumed simulation material law, not a resolved fluid or validated hardware model. Setting, grout/cleanup and fracture remain unimplemented."},
