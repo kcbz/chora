@@ -226,3 +226,10 @@ or validated real material behavior.
   clearance. It passed 100 fresh held-out scenes across all six position and
   direction combinations, plus 49 of 50 routine check scenes. Moving-platform
   curation now accounts for rail position and direction.
+
+- Unified the SO-101 presentation palette for platforms, moved the training
+  shortcut into the setup panel, and added active-job feedback there.
+- Enabled fresh Qwen retraining with archival of the previous model and scores.
+  Evaluations now save a final-state preview for every scored episode.
+- Renamed the planned hierarchical mode Skill Orchestrator and recorded the
+  first tiling pilot architecture.

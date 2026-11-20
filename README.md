@@ -112,8 +112,8 @@ in [Experiments](docs/EXPERIMENTS.md). Material prototypes have their learning
 controls disabled until their task-specific pipelines are ready.
 
 VLA recording, training and diagnostics currently run from the command line.
-See [VLA development](docs/VLA.md). VLM inspection and task planning are
-planned methods in the selector.
+See [VLA development](docs/VLA.md). VLM inspection and the [Skill Orchestrator](docs/SKILL_ORCHESTRATOR.md)
+are planned methods in the selector.
 
 ## Testing
 

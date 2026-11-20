@@ -57,7 +57,19 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 
 .experiment-fields{display:flex;flex-wrap:wrap;align-items:flex-start;gap:14px 20px}
 #method-status:not([hidden]){margin:0 0 12px;padding:9px 12px;border-left:2px solid var(--accent);background:var(--field-bg);color:var(--ink)}
-#training-shortcut{margin-bottom:12px;font-size:12px}
+.training-tools{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px;margin-left:auto;align-self:flex-end}
+.training-activity{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--accent)}
+#training-shortcut{font-size:12px;padding:9px 12px}
+.experiment-fields select:disabled{opacity:.53;cursor:not-allowed;filter:saturate(.4)}
+.stage .stage-status{font:600 10px system-ui,sans-serif;padding:3px 7px;border-radius:20px;border:1px solid var(--line);white-space:nowrap}
+.stage[data-status="complete"] .stage-status{border-color:var(--accent);color:var(--accent);background:var(--active-bg)}
+.stage[data-status="running"] .stage-status{border-color:var(--accent)}
+.stage[data-status="pending"] .stage-status{border-style:dashed}
+.stage button[data-job]{text-align:center;background:var(--active-bg);border-color:var(--accent);color:var(--accent);font-weight:600;padding:9px 8px}
+.stage button[data-job]:hover:enabled{background:var(--accent);color:var(--button-ink)}
+.stage button[data-job]:disabled{border-color:var(--line);background:var(--field-bg);color:var(--muted);cursor:not-allowed}
+.stage button[data-job][aria-busy="true"]{border-color:var(--accent);color:var(--accent)}
+@media(max-width:650px){.training-tools{justify-content:space-between;margin-left:0;flex-basis:100%}}
 #pipeline-title{scroll-margin-top:20px}
 #control-method{padding-right:36px}
 #viewport[data-source="vla"]{aspect-ratio:2/1;cursor:default;touch-action:auto}

@@ -137,6 +137,15 @@ function renderTrainingShortcut(s) {
  const qwenTraining = usesSceneControls() && supportsQwenTraining(s);
  const shortcut = $('training-shortcut');
  shortcut.hidden = !visualTraining && !qwenTraining;
+ const active = uiJob(s);
+ const label = active.running ? (JOBS[active.name]?.working || 'Working') : s.vla?.running ?
+  'Running visual policy' : s.switching || pendingExperiment ? 'Loading scene' : s.running ? 'Running episode' : '';
+ const progress = active.progress || {};
+ const counts = active.running && Number.isFinite(progress.current) && progress.total > 0 ?
+  ` · ${progress.current.toLocaleString()}/${progress.total.toLocaleString()}` : '';
+ $('training-tools').hidden = shortcut.hidden && !label;
+ $('training-activity').hidden = !label;
+ if ($('training-activity-label').textContent !== label + counts) $('training-activity-label').textContent = label + counts;
  shortcut.disabled = Boolean((method === 'expert' && methodPicker.disabled) || s.switching || pendingExperiment);
  shortcut.textContent = visualTraining ? 'Training details ↓' : 'Go to training ↓';
 }
@@ -157,10 +166,11 @@ function renderViewer(s) {
  const canRun = isVisual ? Boolean(v.supported_scene && v.ready && v.recommended_id) :
   method === 'expert' || (method === 'qwen' && !qwenStatus(s));
  const availability = method === 'vlm' ? 'Scene inspection is planned. A vision-language model has yet to be connected.' :
-  method === 'planner' ? 'Task planning is planned. A pretrained action model and skills have yet to be connected.' :
+  method === 'planner' ? 'Planned pilot: a Qwen planner calls checked robot skills and uses simulation feedback to recover.' :
   isVisual && !v.supported_scene ? 'VLA currently supports Bowl · Standard platform.' :
   isVisual && !canRun ? (v.unavailable_reason || 'A visual policy is not available for this scene.') :
-  method === 'qwen' ? qwenStatus(s) : '';
+  method === 'qwen' ? (qwenStatus(s) ||
+   (!s.results?.student ? 'Trained and ready to run. Evaluate student to publish scores and gallery previews.' : '')) : '';
  $('method-status').hidden = !availability;
  $('method-status').textContent = availability;
  $('seed-field').hidden = !usesSceneControls() && !canRun && !running;
@@ -214,22 +224,31 @@ function renderPipeline(s){
   const meta=JOBS[name],card=document.querySelector(`[data-stage="${name}"]`),button=card.querySelector('button[data-job]');
   card.hidden = !showStages || (method === 'expert' && name !== 'check');
   const record=current.name===name?current:(history[name]?.name?history[name]:{});
-  const running=current.name===name&&jobBusy,status=running?'running':record.status||'idle';
+  const saved = savedSummary(name,s);
+  const ready = name==='generate' ? s.oracle?.success_rate>=.9 : name==='curate' ? Boolean(s.generation) :
+   name==='train' ? Boolean(s.curation?.selected_episodes && s.model_ready) :
+   name==='evaluate' ? s.adapter_ready && s.model_ready : true;
+  const running = current.name === name && jobBusy;
+  const status = running ? 'running' : ['failed','cancelled'].includes(record.status) ?
+   record.status : saved ? 'complete' : ready ? 'ready' : 'pending';
   card.dataset.status=status;card.setAttribute('aria-busy',String(running));
-  const statusText=running?(current.pending?'Starting':'Running'):status==='complete'?'Complete':status==='failed'?'Failed':status==='cancelled'?'Stopped':savedSummary(name,s)?'Saved result':'Ready';
+  const statusText = running ? (current.pending ? 'Starting' : 'Running') :
+   {complete:'✓ Complete',failed:'Failed',cancelled:'Stopped',ready:'Ready',pending:'Pending'}[status];
   $('stage-status-'+name).textContent=statusText;
-  $(id).textContent=savedSummary(name,s)||'No saved result yet.';
+  $(id).textContent=saved||'No saved result yet.';
   const progress=record.progress||{},total=Number(progress.total),done=Number(progress.current),determinate=total>0&&Number.isFinite(done);
   const bar=$('stage-progress-'+name);bar.hidden=!running;bar.classList.toggle('indeterminate',!determinate);
   if(determinate){const percentage=Math.max(0,Math.min(100,100*done/total));bar.firstElementChild.style.width=percentage+'%';bar.setAttribute('aria-valuemin','0');bar.setAttribute('aria-valuemax',String(total));bar.setAttribute('aria-valuenow',String(done))}
   else{bar.removeAttribute('aria-valuenow');bar.firstElementChild.style.width='35%'}
   bar.setAttribute('aria-valuetext',progress.message||statusText);
-  const ready=name==='generate'?s.oracle?.success_rate>=.9:name==='curate'?Boolean(s.generation):name==='train'?Boolean(s.curation?.selected_episodes&&s.model_ready&&!s.adapter_ready):name==='evaluate'?s.adapter_ready&&s.model_ready:true;
   button.disabled=busy||s.running||pendingRun||!ready;
-  let label=running?(current.pending?'Starting…':meta.working+(determinate?` ${done.toLocaleString()} / ${total.toLocaleString()}`:'…')):meta.button+' ↗';
-  if(name==='train'&&s.adapter_ready&&!running)label='Student ready';
+  const action = name === 'train' && s.adapter_ready ? 'Retrain student' : meta.button;
+  const label = running ? (current.pending ? 'Starting…' : meta.working +
+   (determinate ? ` ${done.toLocaleString()} / ${total.toLocaleString()}` : '…')) : action;
   buttonLabel(button,label,running);
-  button.title=running?(progress.message||meta.working):busy?'Wait for the current stage to finish.':s.running?'Stop the live episode first.':name==='train'&&s.adapter_ready?'A saved student is already available in the Policy selector.':!ready?'Finish the preceding stages first.':meta.button;
+  button.title=running?(progress.message||meta.working):busy?'Wait for the current stage to finish.':
+   s.running?'Stop the live episode first.':!ready?'Finish the preceding stages first.':
+   name==='train'&&s.adapter_ready?'Train from the base model on the curated data. The previous run will be archived.':action;
  }
  if(!current.name||!visibleJob){$('job').style.display='none';return}
  const meta=JOBS[current.name]||{title:'Pipeline stage'},status=current.status||(current.running?'running':current.exit_code===0?'complete':'idle');

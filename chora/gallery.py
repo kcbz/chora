@@ -20,6 +20,16 @@ def verify_trace(sim,episode):
         raise RuntimeError(f"Saved outcome mismatch for seed {episode['seed']}")
 
 
+def save_thumbnail(camera, sim, episode, policy, output):
+    relative = f"evaluation/{policy}/thumbs/seed_{episode['seed']}.jpg"
+    path = output / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".jpg.tmp")
+    temporary.write_bytes(camera.jpeg(sim, overlay=False))
+    temporary.replace(path)
+    episode.update(thumbnail=relative, thumbnail_verified=True)
+
+
 @exclusive_job("thumbnails")
 def thumbnails(policy="all"):
     from .sim import make_simulation
@@ -29,16 +39,12 @@ def thumbnails(policy="all"):
     total=sum(len(rows) for _,rows in groups)
     if not total:
         raise ValueError("No scored episodes are available. Evaluate a policy first.")
-    sim=make_simulation(); camera=Camera(sim,640,360); completed=0
+    sim=make_simulation(); camera=Camera(sim,640,480); completed=0
     try:
         for name,episodes in groups:
-            folder=OUTPUT/"evaluation"/name/"thumbs";folder.mkdir(parents=True,exist_ok=True)
             for e in episodes:
                 verify_trace(sim,e)
-                relative=f"evaluation/{name}/thumbs/seed_{e['seed']}.jpg"
-                file=OUTPUT/relative;temporary=file.with_suffix(".jpg.tmp")
-                temporary.write_bytes(camera.jpeg(sim,overlay=False));temporary.replace(file)
-                e.update(thumbnail=relative,thumbnail_verified=True)
+                save_thumbnail(camera, sim, e, name, OUTPUT)
                 completed+=1
                 job_progress(completed,total,f"Preparing verified episode thumbnails · {completed}/{total}")
             save_json(OUTPUT/"evaluation"/name/"episodes.json",episodes)

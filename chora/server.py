@@ -167,7 +167,7 @@ class Lab:
         allowed = {"check":["expert"],"generate":["generate"],"curate":["curate"],
                    "train":["train"],"evaluate":["evaluate","--record","3"]}
         if name=="train" and (self.output/"adapter/adapters.safetensors").exists():
-            allowed["train"].append("--resume")
+            allowed["train"].append("--replace")
         if name not in allowed:
             raise ValueError("Unknown job")
         with self.lock:

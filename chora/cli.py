@@ -22,7 +22,9 @@ def main():
     p = sub.add_parser("train",help="Train a local QLoRA adapter using MLX")
     p.add_argument("--iterations",type=int)
     p.add_argument("--batch-size",type=int)
-    p.add_argument("--resume",action="store_true")
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument("--resume", action="store_true", help="Continue from the current adapter")
+    mode.add_argument("--replace", action="store_true", help="Train from the base model and archive the previous run")
     p = sub.add_parser("evaluate",help="Evaluate on reserved seeds")
     p.add_argument("--policy",choices=["expert","base","student"],default="student")
     p.add_argument("--episodes",type=int)
@@ -113,7 +115,7 @@ def main():
         print(build_report())
     elif args.command=="train":
         from .learn import train
-        train(args.iterations,args.resume,args.batch_size)
+        train(args.iterations,args.resume,args.batch_size,replace=args.replace)
     elif args.command=="evaluate":
         from .learn import evaluate
         print(json.dumps(evaluate(args.episodes,args.policy,args.record),indent=2))

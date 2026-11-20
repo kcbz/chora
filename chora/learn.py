@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -70,9 +71,60 @@ def token_dataset(path,tokenizer,max_length):
     return TokenSamples(samples)
 
 
+def publish_training_run(run, output):
+    """Promote a completed adapter and archive the former run and student scores."""
+    if not (run / "adapter/adapters.safetensors").is_file():
+        raise RuntimeError("Training produced no adapter")
+    prior_paths = ["adapter", "training.json", "training_metrics.jsonl",
+                   "selection.json", "training_curve.png", "evaluation/student"]
+    results = read_json(output / "results.json", {})
+    if "student" in results:
+        prior_paths.append("results.json")
+        save_json(run / "results.json", {k: v for k, v in results.items() if k != "student"})
+    prior_paths = [name for name in prior_paths if (output / name).exists()]
+    archive = None
+    if prior_paths:
+        archives = output / "training_runs"
+        archives.mkdir(exist_ok=True)
+        archive = Path(tempfile.mkdtemp(prefix=time.strftime("%Y%m%d_%H%M%S-"), dir=archives))
+
+    moved = []
+    def move(source, destination):
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        source.rename(destination)
+        moved.append((source, destination))
+
+    try:
+        for name in prior_paths:
+            move(output / name, archive / name)
+        for path in run.iterdir():
+            move(path, output / path.name)
+    except BaseException:
+        for source, destination in reversed(moved):
+            destination.rename(source)
+        raise
+    return archive
+
+
 @exclusive_job("train")
-def train(iterations=None,resume=False,batch_size=None):
+def train(iterations=None, resume=False, batch_size=None, *, replace=False):
     verify_dataset()
+    active = OUTPUT / "adapter/adapters.safetensors"
+    if active.is_file() and not (resume or replace):
+        raise RuntimeError("A trained adapter exists. Use --replace for a fresh run or --resume to continue.")
+    if resume and not active.is_file():
+        raise RuntimeError("No saved adapter to resume")
+    with tempfile.TemporaryDirectory(prefix=".training-", dir=OUTPUT) as directory:
+        run = Path(directory)
+        summary = fit_training(run, iterations, active if resume else None, batch_size)
+        publish_training_run(run, OUTPUT)
+    from .report import build_report
+    build_report()
+    job_progress(summary["iteration"], summary["requested_iterations"], "Model adapter saved · ready to run")
+    return summary
+
+
+def fit_training(run, iterations, previous, batch_size):
     job_progress(message="Loading the local Qwen model…")
     import mlx.core as mx
     from mlx.utils import tree_flatten
@@ -91,22 +143,9 @@ def train(iterations=None,resume=False,batch_size=None):
         raise RuntimeError("Generate and curate at least 200 episodes before training")
     if not (MODEL_DIR/"config.json").exists():
         raise RuntimeError("Run `python -m chora download` first")
-    adapter = OUTPUT/"adapter"
-    metrics = OUTPUT/"training_metrics.jsonl"
-    previous = None
-    if (adapter/"adapters.safetensors").exists() and not resume:
-        raise RuntimeError("An adapter already exists. Move outputs/adapter aside before starting a new run.")
-    if resume:
-        import shutil
-        if not (adapter/"adapters.safetensors").exists():
-            raise RuntimeError("No saved adapter to resume")
-        archive = OUTPUT/"training_runs"/time.strftime("%Y%m%d_%H%M%S")
-        archive.mkdir(parents=True,exist_ok=False)
-        adapter.rename(archive/"adapter")
-        previous = archive/"adapter/adapters.safetensors"
-        for file in (metrics,OUTPUT/"training.json"):
-            if file.exists(): file.rename(archive/file.name)
-    adapter.mkdir(parents=True,exist_ok=True)
+    adapter = run / "adapter"
+    metrics = run / "training_metrics.jsonl"
+    adapter.mkdir()
     model,tokenizer = load(str(MODEL_DIR))
     t = cfg["training"]
     train_set = token_dataset(OUTPUT/"data/curated/train.jsonl",tokenizer,t["max_seq_length"])
@@ -117,7 +156,7 @@ def train(iterations=None,resume=False,batch_size=None):
     args = SimpleNamespace(**{**CONFIG_DEFAULTS,"model":str(MODEL_DIR),"data":str(OUTPUT/"data/curated"),"seed":cfg["seed"],
         "iters":n,"batch_size":batch_size or t["batch_size"],"learning_rate":t["learning_rate"] if previous is None else t["learning_rate"]*.5,
         "num_layers":t["num_layers"],"max_seq_length":t["max_seq_length"],
-        "adapter_path":str(adapter),"save_every":50,"steps_per_report":10,
+        "adapter_path":str(OUTPUT/"adapter"),"save_every":50,"steps_per_report":10,
         "steps_per_eval":100,"val_batches":20,"grad_checkpoint":True,"mask_prompt":True,
         "resume_adapter_file":str(previous) if previous else None,
         "lora_parameters":{"rank":t["rank"],"scale":32.0,"dropout":0.0}})
@@ -135,7 +174,7 @@ def train(iterations=None,resume=False,batch_size=None):
     objective = partial(assistant_loss,completion_length=max_completion)
     started = time.monotonic()
     summary = {"status":"running","model":cfg["model"]["id"],"backend":"MLX QLoRA","requested_iterations":n,"iteration":0,"batch_size":args.batch_size,"resumed_from":str(previous) if previous else None}
-    save_json(OUTPUT/"training.json",summary)
+    save_json(run/"training.json",summary)
     job_progress(0,n,"Preparing training examples…")
     class BudgetReached(Exception):
         pass
@@ -146,7 +185,7 @@ def train(iterations=None,resume=False,batch_size=None):
             append_jsonl(metrics,{"type":"train",**info})
             summary.update(info)
             summary["estimated_total_seconds"] = info["elapsed_seconds"]*n/info["iteration"]
-            save_json(OUTPUT/"training.json",summary)
+            save_json(run/"training.json",summary)
             job_progress(info["iteration"],n,f"Training step {info['iteration']:,} of {n:,}")
             print(f"Training {info['iteration']}/{n}: loss {info['train_loss']:.4f}, {info['peak_memory']:.2f} GB peak",flush=True)
             if info["elapsed_seconds"] >= t["max_minutes"]*60:
@@ -154,13 +193,13 @@ def train(iterations=None,resume=False,batch_size=None):
         def on_val_loss_report(self,info):
             append_jsonl(metrics,{"type":"validation",**info})
             summary["validation_loss"] = info["val_loss"]
-            save_json(OUTPUT/"training.json",summary)
+            save_json(run/"training.json",summary)
             job_progress(summary["iteration"],n,"Checking the model on validation examples…")
     try:
         fit(model,optim.Adam(learning_rate=args.learning_rate),train_set,val_dataset=val_set,
             args=fit_args,loss=objective,training_callback=Progress())
         summary["status"] = "complete"
-    except (BudgetReached,KeyboardInterrupt):
+    except BudgetReached:
         mx.save_safetensors(str(adapter/"adapters.safetensors"),dict(tree_flatten(model.trainable_parameters())))
         summary["status"] = "stopped_with_adapter"
     except Exception as e:
@@ -168,8 +207,7 @@ def train(iterations=None,resume=False,batch_size=None):
         raise
     finally:
         summary["wall_seconds"] = time.monotonic()-started
-        save_json(OUTPUT/"training.json",summary)
-    job_progress(summary["iteration"],n,"Training complete · model adapter saved" if summary["status"]=="complete" else "Training stopped · model adapter saved")
+        save_json(run/"training.json",summary)
     return summary
 
 
@@ -327,7 +365,8 @@ def evaluate(n=None,policy_name="student",record=3):
     from .episodes import rollout
     from .policy import make_expert
     from .sim import make_simulation
-    from .visualization import Recorder
+    from .gallery import save_thumbnail
+    from .visualization import Camera, Recorder
     cfg = config(); n = n or cfg["evaluation"]["episodes"]
     if not 1<=n<=100:
         raise ValueError("Evaluation has at most 100 held-out seeds")
@@ -336,20 +375,38 @@ def evaluate(n=None,policy_name="student",record=3):
     policy = None if policy_name=="expert" else Student(base=policy_name=="base")
     results = []
     out = OUTPUT/"evaluation"/policy_name
-    out.mkdir(parents=True,exist_ok=True)
-    for i in range(n):
-        seed = cfg["evaluation"]["seed_start"]+i
-        sim.reset(seed)
-        recorder = Recorder(sim,out/f"seed_{seed}.mp4") if i<record else None
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".evaluation-", dir=OUTPUT) as directory:
+        stage = Path(directory)
+        trial_dir = stage / "evaluation" / policy_name
+        trial_dir.mkdir(parents=True)
+        camera = Camera(sim,640,480)
         try:
-            e = rollout(sim,make_expert(seed,cfg) if policy is None else policy,seed,timing=True)
+            for i in range(n):
+                seed = cfg["evaluation"]["seed_start"]+i
+                sim.reset(seed)
+                recorder = Recorder(sim,trial_dir/f"seed_{seed}.mp4") if i<record else None
+                try:
+                    e = rollout(sim,make_expert(seed,cfg) if policy is None else policy,seed,timing=True)
+                finally:
+                    if recorder: recorder.close()
+                e["video"] = f"evaluation/{policy_name}/seed_{seed}.mp4" if recorder else None
+                save_thumbnail(camera,sim,e,policy_name,stage)
+                results.append(e)
+                job_progress(i+1,n,f"Evaluated {i+1} of {n} scenes · {sum(x['success'] for x in results)} successful")
+                print(f"{policy_name}: {i+1}/{n}; successes {sum(x['success'] for x in results)}",flush=True)
         finally:
-            if recorder: recorder.close()
-        e["video"] = f"evaluation/{policy_name}/seed_{seed}.mp4" if recorder else None
-        results.append(e)
-        save_json(out/"episodes.json",results)
-        job_progress(i+1,n,f"Evaluated {i+1} of {n} scenes · {sum(x['success'] for x in results)} successful")
-        print(f"{policy_name}: {i+1}/{n}; successes {sum(x['success'] for x in results)}",flush=True)
+            camera.close()
+        save_json(trial_dir/"episodes.json",results)
+        previous = stage / "previous"
+        if out.exists():
+            out.rename(previous)
+        try:
+            trial_dir.rename(out)
+        except BaseException:
+            if previous.exists():
+                previous.rename(out)
+            raise
     failures = {}
     for e in results:
         if not e["success"]:

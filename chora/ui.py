@@ -18,7 +18,7 @@ CONTROL_METHODS = {
     "qwen": ("Qwen · State-based imitation", "Learn high-level actions from structured simulator state."),
     "vla": ("VLA · Camera-based control", "Predict joint targets from camera frames, an instruction, and joint state."),
     "vlm": ("VLM · Visual inspection", "Use images and questions to inspect the scene and describe the result."),
-    "planner": ("Planner + action model", "Choose the next step and call a trained action model. A vision model can help verify progress."),
+    "planner": ("Skill Orchestrator", "Plan the job, call a robot skill, and check the result before moving on."),
 }
 
 

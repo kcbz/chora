@@ -92,11 +92,16 @@ localhost ports. Run these commands in a normal Terminal session in that case.
 
 `configs/default.yaml` holds experiment settings. Changing physics, spawn ranges,
 or the expert requires a fresh dataset; move previous `outputs/` aside first.
-To restart from the base model, archive `outputs/adapter`, `outputs/training.json`,
-and `outputs/training_metrics.jsonl` before starting. `--resume` automatically
-archives the previous run under `outputs/training_runs/` and continues from its
-weights with a fresh optimizer at half the configured learning rate. Pipeline stages use a file lock
-to prevent simultaneous writes. Existing adapters are never silently overwritten.
+Use **Retrain student** in the lab or `train --replace` to start from the base
+model using the curated data. `train --resume` instead continues with the saved
+weights and a fresh optimizer at half the configured learning rate. Both run
+in a temporary directory. Once an adapter is ready, Chora archives the previous
+adapter, training records, and student evaluation under `outputs/training_runs/`.
+A failure during training leaves the previous run active.
+
+A trained Qwen adapter can run an episode immediately. Evaluate after training
+to score that adapter on reserved scenes. Evaluation saves a verified final-state
+image for every episode and records movies for the first three by default.
 
 ## Outputs
 

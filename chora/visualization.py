@@ -13,6 +13,9 @@ from PIL import Image, ImageDraw, ImageFont
 class Camera:
     def __init__(self, sim, width=1280, height=960):
         self.renderer = mujoco.Renderer(sim.model, height=height, width=width)
+        self.platform_id = None
+        if getattr(sim, "object_kind", None) in {"bowl", "part", "ingredient"}:
+            self.platform_id = sim.model.geom("table").id
         self.orbit = mujoco.MjvCamera()
         mujoco.mjv_defaultCamera(self.orbit)
         self.set_orbit({"azimuth":135,"elevation":-25,"distance":.65,"lookat":[.12,0,.16]})
@@ -31,6 +34,13 @@ class Camera:
             for mesh_id in dirty:mujoco.mjr_uploadMesh(sim.model,self.renderer._mjr_context,mesh_id)
             dirty.clear()
         self.renderer.update_scene(sim.data, camera=self.orbit if camera=="orbit" else camera)
+        if self.platform_id is not None:
+            # Style the presentation view without changing recorded VLA inputs.
+            scene = self.renderer.scene
+            for geom in scene.geoms[:scene.ngeom]:
+                if geom.objtype == mujoco.mjtObj.mjOBJ_GEOM and geom.objid == self.platform_id:
+                    geom.rgba[:] = (.23, .42, .76, 1)
+                    break
         frame = self.renderer.render().copy()
         if not overlay:
             return frame
