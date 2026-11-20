@@ -153,9 +153,13 @@ are not yet established.
 
 Start the normal lab with `.venv/bin/python -m chora serve` and open
 [http://127.0.0.1:8765/](http://127.0.0.1:8765/). Select **Bowl · Standard platform**,
-then use the **Visual VLA** panel below the main simulation. Choose a discovered
+then use the **VLA development diagnostics** panel below the main simulation. Choose a discovered
 checkpoint, set a development seed in 20000..29999 and click **Test VLA**.
-The preferred default is the latest full-trajectory pilot, when available.
+No failed or untested checkpoint is selected as a usable default. A recommended
+default requires at least ten distinct scenes outside that dataset's training and
+validation episodes, at least 80% placement success and no collisions in those
+trials. Reported weight hashes must match the checkpoint. This is a basic simulation
+development check, not a final benchmark or physical validation.
 
 The server launches one bounded synchronous episode in `.venv-vla`, showing live
 scene/wrist views and progress, inference timing and the actual outcome. **Stop**
@@ -173,3 +177,9 @@ UI runs live under `outputs/vla/ui-runs/`, with atomic camera/progress snapshots
 the regular report/episode traces and a sibling process log. This is inference
 and inspection UI, not a visual-policy data collection/training interface.
 Restart an already-running lab after updating server code.
+
+Failed checkpoints are labelled with their actual success counts. Repeated runs
+of one seed do not count as independent scenes; stopped runs are excluded. Without
+a qualifying checkpoint, the UI says **No usable VLA yet** and diagnostics require
+an explicit checkpoint choice. The expert and Qwen baseline remain available in
+the main controls. These defaults address the observed oscillating two-demo pilot.

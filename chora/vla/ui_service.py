@@ -1,5 +1,6 @@
 """Isolated VLA subprocess management; the regular lab does not import torch."""
 import json
+import hashlib
 from pathlib import Path
 import re
 import subprocess
@@ -21,10 +22,29 @@ class VLAService:
         self.root = Path(root).resolve()
         self.process = self.directory = self.log = self.run_id = self.stop_at = None
         self.lock = threading.RLock()
+        self.weight_hashes = {}
 
     @property
     def running(self):
         return self.process is not None and self.process.poll() is None
+
+    def evaluations(self):
+        trials = {}
+        folders = [self.root/'outputs/vla/rollouts', self.root/'outputs/vla/ui-runs']
+        files = [f for folder in folders for f in folder.glob('*/report.json')]
+        for file in sorted(files, key=lambda p:p.stat().st_mtime):
+            report = read(file, {})
+            checkpoint = report.get('checkpoint')
+            if report.get('status') != 'complete' or not isinstance(checkpoint,str):
+                continue
+            checkpoint = str((self.root/checkpoint).resolve())
+            for trial in report.get('trials',[]):
+                if trial.get('reason') not in {'success','collision','tick_limit','policy_error'}:
+                    continue
+                seed = trial.get('seed')
+                if isinstance(seed,int):
+                    trials.setdefault(checkpoint,{})[seed] = {**trial,'weight_sha256':report.get('checkpoint_sha256')}
+        return trials
 
     def candidates(self):
         training = (self.root/'outputs/vla/training').resolve()
@@ -33,9 +53,10 @@ class VLAService:
         for file in sorted(datasets.glob('*/dataset.json')):
             value = read(file, {})
             key = value.get('fingerprint')
-            if value.get('protocol') == 'chora-vla-pilot-chunks-v1' and isinstance(key, str) and file.resolve().is_relative_to(datasets):
+            if value.get('protocol') in {'chora-vla-pilot-chunks-v1','chora-vla-pilot-chunks-v2'} and isinstance(key, str) and file.resolve().is_relative_to(datasets):
                 by_fingerprint[key] = file.parent.resolve()
         result = []
+        evaluations = self.evaluations()
         for file in training.glob('*/report.json'):
             report = read(file, {})
             if report.get('status') != 'complete' or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,100}', file.parent.name):
@@ -58,9 +79,24 @@ class VLAService:
             if not isinstance(step, int):
                 continue
             name = file.parent.name.removeprefix('bowl-').removesuffix('-v1').replace('-', ' ').capitalize()
-            result.append(dict(id=file.parent.name, label=f'{name} · {step:,} updates', checkpoint=checkpoint,
-                               dataset=dataset, full_trajectory=report.get('mode') == 'pilot_training', updated=file.stat().st_mtime))
-        return sorted(result, key=lambda row: (row['full_trajectory'], row['updated']), reverse=True)
+            trials = list(evaluations.get(str(checkpoint),{}).values())
+            passed = sum(t.get('success') is True for t in trials)
+            evaluation = dict(successes=passed,episodes=len(trials),collisions=sum(bool(t.get('collisions')) for t in trials))
+            known_seeds={e['seed'] for e in read(dataset/'dataset.json',{}).get('episodes',[])}
+            unseen=[t for t in trials if t.get('seed') not in known_seeds]
+            unseen_passed=sum(t.get('success') is True for t in unseen)
+            evaluation.update(unseen_episodes=len(unseen),unseen_successes=unseen_passed)
+            recommended = False
+            if len(unseen)>=10 and unseen_passed/len(unseen)>=.8 and not any(t.get('collisions') for t in unseen):
+                stat=weights.stat();key=(str(weights),stat.st_size,stat.st_mtime_ns)
+                if key not in self.weight_hashes:self.weight_hashes[key]=hashlib.sha256(weights.read_bytes()).hexdigest()
+                recommended=all(t.get('weight_sha256')==self.weight_hashes[key] for t in unseen)
+            score = f'{passed}/{len(trials)} development scenes' if trials else 'Untested diagnostic'
+            if trials and not passed:score=f'Failed ({passed}/{len(trials)})'
+            result.append(dict(id=file.parent.name, label=f'{score} · {name} · {step:,} updates', checkpoint=checkpoint,
+                               dataset=dataset,evaluation=evaluation,recommended=recommended,
+                               full_trajectory=report.get('mode') == 'pilot_training', updated=file.stat().st_mtime))
+        return sorted(result, key=lambda row: (row['recommended'],row['full_trajectory'],row['updated']), reverse=True)
 
     def start(self, candidate_id, seed):
         with self.lock:
@@ -99,7 +135,8 @@ class VLAService:
                 self.process.terminate()
             candidates = self.candidates()
             state = dict(ready=bool(candidates) and (self.root/'.venv-vla/bin/python').is_file(),
-                         candidates=[dict(id=r['id'], label=r['label']) for r in candidates],
+                         candidates=[dict(id=r['id'], label=r['label'],evaluation=r['evaluation']) for r in candidates],
+                         recommended_id=next((r['id'] for r in candidates if r['recommended']),None),
                          running=self.running, id=self.run_id, phase='idle', has_frame=False)
             if not state['ready']:
                 state['unavailable_reason'] = 'No local VLA checkpoint or VLA environment is available. See docs/VLA.md.'

@@ -111,16 +111,18 @@ controls disabled until their task-specific pipelines are ready.
 ### Test the visual VLA
 
 1. Select **Bowl · Standard platform** in the scene dropdown.
-2. Scroll to the **Visual VLA** panel below the main simulation.
-3. Choose a local checkpoint (for example, **Dense pilot · 1,000 updates**), keep
-   development seed **20003**, and click **Test VLA**.
+2. Scroll to the **VLA development diagnostics** panel below the main simulation.
+3. Choose a checkpoint by its measured development result, keep development seed
+   **20003**, and click **Test VLA**. Failed/untested checkpoints remain available
+   for explicit diagnostics; they are not selected as a usable default.
 4. Watch the scene/wrist camera preview. Use **Stop** to cancel, or **Open run
    results** to inspect the completed test.
 
 VLA tests use the separate `.venv-vla` environment and locally trained weights;
 see [VLA setup](docs/VLA.md). The panel explains when either is unavailable.
-The current pilot is experimental and has not completed placement in its
-recorded development tests. These outcomes are separate from Qwen's scores.
+The panel says **No usable VLA yet** until a checkpoint passes the documented
+unseen-scene check. Training completion alone does not qualify. These outcomes
+are separate from Qwen's scores.
 After updating server code, stop the server with Ctrl-C and run `serve` again.
 
 ## Testing

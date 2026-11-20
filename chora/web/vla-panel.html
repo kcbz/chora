@@ -1,9 +1,9 @@
 <section class="card vla-panel" id="vla-panel" aria-labelledby="vla-heading">
-  <div class="sectionhead"><h2 id="vla-heading">Visual VLA</h2><span class="tag">Experimental · standard bowl</span></div>
-  <p class="small">Test a camera-based policy using its scene and wrist views. The current pilot has not yet completed placement in its development tests.</p>
+  <div class="sectionhead"><h2 id="vla-heading">VLA development diagnostics</h2><span class="tag">Experimental · standard bowl</span></div>
+  <p class="small" id="vla-readiness">No usable visual policy yet. These checkpoints are diagnostics; failed policies can oscillate without completing the task.</p>
   <div class="vla-layout">
     <div class="vla-controls">
-      <label for="vla-checkpoint">Checkpoint</label><select id="vla-checkpoint"><option value="">Loading local checkpoints…</option></select>
+      <label for="vla-checkpoint">Checkpoint</label><select id="vla-checkpoint" onchange="renderVla(state)"><option value="">Loading local checkpoints…</option></select>
       <label for="vla-seed">Development scene seed</label><input id="vla-seed" type="number" min="20000" max="29999" step="1" value="20003">
       <p class="small" id="vla-availability"></p>
       <div class="buttons"><button class="primary" id="vla-run" type="button" onclick="startVla()" disabled>Test VLA</button><button class="secondary" id="vla-stop" type="button" onclick="stopVla()" disabled>Stop</button></div>

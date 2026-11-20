@@ -141,3 +141,28 @@ def test_lab_rejects_unsupported_scenes_and_conflicting_jobs(monkeypatch):
     with pytest.raises(ValueError,match='VLA'):lab.launch('check')
     with pytest.raises(ValueError,match='Finish'):lab.select_experiment('so101-bowl')
     assert lab.commands.empty()
+
+
+def test_recommendation_requires_unseen_successes_and_matching_weights(tmp_path):
+    import hashlib
+    checkpoint=candidate(tmp_path)
+    python=tmp_path/'.venv-vla/bin/python';python.parent.mkdir(parents=True);python.touch()
+    dataset=tmp_path/'outputs/vla/datasets/pilot/dataset.json'
+    value=json.loads(dataset.read_text());value['episodes']=[dict(seed=21000+i,split='train') for i in range(10)]
+    dataset.write_text(json.dumps(value))
+    folder=tmp_path/'outputs/vla/rollouts/test';folder.mkdir(parents=True)
+    def report(seeds,success=True):
+        payload=dict(status='complete',checkpoint=str(checkpoint),
+                     checkpoint_sha256=hashlib.sha256((checkpoint/'model.safetensors').read_bytes()).hexdigest(),
+                     trials=[dict(seed=seed,reason='success' if success else 'tick_limit',success=success,collisions=0) for seed in seeds])
+        (folder/'report.json').write_text(json.dumps(payload))
+    service=VLAService(tmp_path)
+    report(range(21000,21010))
+    assert service.status()['recommended_id'] is None
+    report(range(25000,25010),success=False)
+    state=service.status();assert state['recommended_id'] is None
+    assert state['candidates'][0]['label'].startswith('Failed (0/10)')
+    report(range(25000,25010))
+    assert service.status()['recommended_id']=='dense-pilot'
+    (checkpoint/'model.safetensors').write_bytes(b'changed weights')
+    assert service.status()['recommended_id'] is None

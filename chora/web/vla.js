@@ -14,14 +14,15 @@ async function renderVla(s){
  const candidates=v.candidates||[],signature=JSON.stringify(candidates);
  if(signature!==vlaChoices){
   const selected=$('vla-checkpoint').value;vlaChoices=signature;$('vla-checkpoint').replaceChildren();
+  const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent=!candidates.length?'No local VLA checkpoints':v.recommended_id?'Choose a checkpoint':'No usable VLA yet · choose a diagnostic';$('vla-checkpoint').append(placeholder);
   for(const c of candidates){const o=document.createElement('option');o.value=c.id;o.textContent=c.label;$('vla-checkpoint').append(o)}
-  if(candidates.some(c=>c.id===selected))$('vla-checkpoint').value=selected;
-  if(!candidates.length){const o=document.createElement('option');o.value='';o.textContent='No local VLA checkpoints';$('vla-checkpoint').append(o)}
+  $('vla-checkpoint').value=candidates.some(c=>c.id===selected)?selected:(v.recommended_id||'');
  }
  const supported=Boolean(v.supported_scene);
  $('vla-checkpoint').disabled=running||other||!supported;$('vla-seed').disabled=running||other||!supported;
  $('vla-availability').textContent=!s.vla?'Restart the lab server to enable VLA tests.':!supported?'Select Bowl · Standard platform above to test these checkpoints.':!v.ready?v.unavailable_reason:other?'Finish the current episode or pipeline stage first.':'Development seeds: 20000–29999. These tests do not use final benchmark scenes.';
- $('vla-run').disabled=running||other||!supported||!v.ready;
+ $('vla-readiness').textContent=v.recommended_id?'A checkpoint has passed the basic unseen-scene development check. This is still a simulation policy.':'No usable visual policy yet. These checkpoints are diagnostics; failed policies can oscillate without completing the task. The expert and Qwen controls above remain available.';
+ $('vla-run').disabled=running||other||!supported||!v.ready||!$('vla-checkpoint').value;
  buttonLabel($('vla-run'),running?(v.phase==='stopping'?'Stopping…':v.phase==='running'?'Testing…':'Loading…'):'Test VLA',running);
  $('vla-stop').disabled=!v.running||v.phase==='stopping';$('vla-panel').setAttribute('aria-busy',String(running));
  let message=running?(v.phase==='stopping'?'Stopping the test…':v.phase==='running'?`Running · tick ${v.tick||0} / ${v.max_ticks||240}`:'Loading the visual policy…'):'Choose a checkpoint to test.';
