@@ -87,15 +87,18 @@ PDFs and wheel/workspace configuration.
 
 ## Usage
 
-With [the local lab running](#launch-the-ui), select a scene and policy, and click
-**Run episode**. A trained student is available only when its local adapter exists.
+With [the local lab running](#launch-the-ui), select a **Scene** and a
+**Control method**. **Scripted expert** runs the programmed controller.
+**Qwen · State-based imitation** uses a trained adapter for the selected scene,
+with training and evaluation available for the bowl tasks. **VLA · Camera-based
+control** uses the same viewer when an evaluated model is available.
 
 - Drag to orbit, Shift-drag or right-drag to pan, and scroll to zoom.
 - Use **Front view** and **Top view** for preset camera angles.
 - Change **1×, 2× or 4×** beside the simulation during playback. These are target
   speeds; the measured multiplier shows achieved throughput.
 - Use **Appearance** in the navbar for theme settings, and **Gallery/Reports** for
-  locally generated recordings and evaluation results.
+  recordings and results scoped to the selected scene and control method.
 
 To open the coordinated tiling scene directly:
 
@@ -108,15 +111,9 @@ for expert checks, demonstration collection, curation, training and evaluation i
 in [Experiments](docs/EXPERIMENTS.md). Material prototypes have their learning
 controls disabled until their task-specific pipelines are ready.
 
-### Visual policy
-
-The **Visual policy** section shows whether a working camera-based controller is
-available. There is currently no working VLA model; it shows **In development**.
-When an evaluated model is available, the section provides its run controls and
-camera preview. Internal training experiments are kept out of the main UI.
-
-Developer recording, training and diagnostic commands are in [VLA development](docs/VLA.md).
-After updating server code, stop the server with Ctrl-C and run `serve` again.
+VLA recording, training and diagnostics currently run from the command line.
+See [VLA development](docs/VLA.md). VLM inspection and task planning are
+planned methods in the selector.
 
 ## Testing
 

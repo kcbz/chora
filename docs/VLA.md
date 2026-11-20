@@ -2,7 +2,7 @@
 
 Chora has fixed-tick SO-101 expert recording, replay, and an experimental
 visual imitation trainer. Its trained pilot failed the closed-loop placement
-tests. The lab labels the visual policy as in development. See
+tests. The lab shows its availability in the VLA control method. See
 [VLA training](VLA_TRAINING.md) for the experimental pipeline and
 [the failure analysis](VLA_FAILURE_ANALYSIS.md) for the measured outcomes.
 
@@ -165,10 +165,11 @@ are not yet established.
 
 ## Visual policy in the browser
 
-The lab's **Visual policy** section presents one evaluated model when available.
-It does not expose the training-run directory as a checkpoint picker. Without a
-qualifying model it displays **In development** and a plain unavailable status;
-seed inputs, run controls and empty camera panes are hidden.
+In the lab select **Bowl · Standard platform**, then **VLA · Camera-based
+control**. With an evaluated model, the main viewer shows its front and wrist
+cameras and Experiment controls handles the seed, run, stop, and outcome.
+Without one, the same viewer remains available as a scene preview. Gallery
+and Reports are scoped to this method.
 
 A model must satisfy the basic development check: at least ten distinct scenes
 outside the dataset's train/validation episodes, at least 80% placement success,

@@ -9,7 +9,7 @@ async function setPlaybackSpeed(value){
  finally{speedRequestPending=false}
 }
 function renderPlayback(s){
- const supported=typeof s.playback_speed==='number';
+ const supported=usesSceneControls()&&typeof s.playback_speed==='number';
  $('playback-control').hidden=!supported;if(!supported)return;
  if(!speedRequestPending)document.querySelectorAll('[data-playback-speed]').forEach(button=>{
   const selected=Number(button.dataset.playbackSpeed)===s.playback_speed;
@@ -18,12 +18,50 @@ function renderPlayback(s){
  const actual=s.achieved_speed;
  $('playback-timing').textContent=typeof actual==='number'?`${s.running?'Actual':'Last run'} ${actual.toFixed(2)}×`:'';
 }
-const $=id=>document.getElementById(id);let state={},busy=false,loadingFrame=false,pendingJob=null,pendingRun=false,requestError=null;
+const $ = id => document.getElementById(id);
+const methodPicker = $('control-method');
+let state = {}, pendingJob = null, pendingRun = false, pendingVla = false, requestError = null;
+let method = methodPicker.value || 'expert';
+const seeds = {expert: '0', qwen: '0', vla: '20003'};
+const usesSceneControls = () => method === 'expert' || method === 'qwen';
+const currentPolicy = () => method === 'qwen' ? 'student' : 'expert';
+const visualEpisode = s => method === 'vla' && Boolean(pendingVla || s.vla?.running ||
+ (s.vla?.ready && s.vla?.id));
+const visualRun = s => visualEpisode(s) && Boolean(pendingVla || s.vla?.running || s.vla?.has_frame);
+
 async function post(url,data){$('error').textContent='';try{let r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});let d=await r.json();if(!r.ok)throw Error(d.error);return d}catch(e){$('error').textContent=e.message;throw e}}
-async function control(operation){
- if(operation==='run'){pendingRun=true;renderViewer(state)}
- try{await post('/api/control',{operation,seed:Number($('seed').value),policy:$('policy').value})}
- catch{pendingRun=false;renderViewer(state)}
+
+async function control(operation) {
+ if (operation !== 'stop' && !$('seed').reportValidity()) return;
+ if (method === 'vla') {
+  try {
+   if (operation === 'stop') {
+    await post('/api/vla', {operation});
+    state.vla = {...state.vla, phase: 'stopping'};
+   } else if (operation === 'run' && state.vla?.supported_scene && state.vla.ready) {
+    pendingVla = true;
+    renderWorkspace(state);
+    const result = await post('/api/vla', {operation, checkpoint: state.vla.recommended_id, seed: Number($('seed').value)});
+    state.vla = {...state.vla, id: result.id, running: true, phase: 'loading', has_frame: false,
+      frame_revision: null, report_url: null, tick: undefined};
+   }
+  } catch {} finally {
+   pendingVla = false;
+   renderWorkspace(state);
+  }
+  return;
+ }
+ if (!usesSceneControls()) return;
+ if (operation === 'run') {
+  pendingRun = true;
+  renderWorkspace(state);
+ }
+ try {
+  await post('/api/control', {operation, seed: Number($('seed').value), policy: currentPolicy()});
+ } catch {
+  pendingRun = false;
+  renderWorkspace(state);
+ }
 }
 async function camera(name){try{await post('/api/control',{operation:'camera',camera:name});['front','top','orbit'].forEach(n=>$(n).classList.toggle('active',n===name))}catch{}}
 
@@ -42,7 +80,7 @@ function scheduleOrbit(){
 const viewport=$('viewport');
 viewport.addEventListener('contextmenu',e=>e.preventDefault());
 viewport.addEventListener('pointerdown',e=>{
- if(!state.ready||!([0,2].includes(e.button)))return;
+ if(!state.ready||visualRun(state)||!([0,2].includes(e.button)))return;
  e.preventDefault();drag={x:e.clientX,y:e.clientY,button:e.button};
  viewport.setPointerCapture(e.pointerId);viewport.classList.add('dragging');
 });
@@ -59,7 +97,7 @@ viewport.addEventListener('pointermove',e=>{
 });
 function endDrag(){drag=null;viewport.classList.remove('dragging')}
 viewport.addEventListener('pointerup',endDrag);viewport.addEventListener('pointercancel',endDrag);
-viewport.addEventListener('wheel',e=>{if(!state.ready)return;e.preventDefault();orbit.distance=Math.max(.22,Math.min(1.8,orbit.distance*Math.exp(e.deltaY*.0012)));scheduleOrbit()},{passive:false});
+viewport.addEventListener('wheel',e=>{if(!state.ready||visualRun(state))return;e.preventDefault();orbit.distance=Math.max(.22,Math.min(1.8,orbit.distance*Math.exp(e.deltaY*.0012)));scheduleOrbit()},{passive:false});
 
 const JOBS={
  'vla-train':{title:'Visual policy training',working:'Training visual policy'},
@@ -84,15 +122,48 @@ function buttonLabel(button,text,loading){
  if(!label){button.replaceChildren();const spinner=document.createElement('span');spinner.className='spinner';spinner.setAttribute('aria-hidden','true');button.append(spinner);label=document.createElement('span');label.className='button-label';button.append(label)}
  button.querySelector('.spinner').hidden=!loading;label.textContent=text;button.setAttribute('aria-busy',String(loading));
 }
-function renderViewer(s){
- if(s.running)pendingRun=false;
- const running=Boolean(s.running||pendingRun||s.switching),preparing=s.switching||pendingRun||['preparing','loading_policy'].includes(s.phase);
- const pipeline=Boolean(uiJob(s).running||s.vla?.running);
- buttonLabel($('run'),running?(preparing?'Preparing…':'Running…'):'Run episode',running);
- $('run').disabled=!s.ready||running||pipeline;$('reset').disabled=!s.ready||running||pipeline;$('stop').disabled=!s.running;
- const activity=$('viewer-activity');activity.hidden=!running&&Boolean(s.ready);
-  const activityLabel=!s.ready?'Preparing scene…':s.switching?'Loading experiment…':preparing?'Loading policy…':s.policy==='student'?'Student running':'Expert running';if(!activity.hidden){if(activity.dataset.label!==activityLabel||!activity.firstElementChild){activity.replaceChildren();const spinner=document.createElement('span');spinner.className='spinner';spinner.setAttribute('aria-hidden','true');const text=document.createElement('span');text.textContent=activityLabel;activity.append(spinner,text);activity.dataset.label=activityLabel}}
- document.querySelector('.viewer').setAttribute('aria-busy',String(running||!s.ready));
+function renderViewer(s) {
+ const v = s.vla || {};
+ const isVisual = method === 'vla';
+ const visual = visualRun(s);
+ const running = Boolean(isVisual ? v.running || pendingVla : s.running || pendingRun);
+ const preparing = Boolean(s.switching || (isVisual ? pendingVla || v.phase === 'loading' : pendingRun || ['preparing','loading_policy'].includes(s.phase)));
+ const blocked = Boolean(uiJob(s).running || s.switching || pendingExperiment || (isVisual ? s.running : v.running));
+ const canRun = isVisual ? Boolean(v.supported_scene && v.ready && v.recommended_id) :
+  method === 'expert' || (method === 'qwen' && s.adapter_ready && s.experiment?.physics?.learning_enabled !== false);
+ const availability = method === 'vlm' ? 'Scene inspection is planned. A vision-language model has yet to be connected.' :
+  method === 'planner' ? 'Task planning is planned. A pretrained action model and skills have yet to be connected.' :
+  isVisual && !v.supported_scene ? 'VLA currently supports Bowl · Standard platform.' :
+  isVisual && !canRun ? (v.unavailable_reason || 'A visual policy is not available for this scene.') :
+  method === 'qwen' && !canRun ? (s.experiment?.physics?.learning_enabled === false ?
+   'This scene is a scripted trial. Its student training is still in development.' :
+   'Train a Qwen student for this scene using the learning pipeline below.') : '';
+ $('method-status').hidden = !availability;
+ $('method-status').textContent = availability;
+ $('seed-field').hidden = !usesSceneControls() && !canRun && !running;
+ $('episode-buttons').hidden = !usesSceneControls() && !canRun && !running;
+ $('seed').disabled = running || blocked;
+ $('run').disabled = !s.ready || running || blocked || !canRun;
+ $('reset').hidden = !usesSceneControls();
+ $('reset').disabled = !s.ready || running || blocked;
+ $('stop').disabled = isVisual ? !v.running || v.phase === 'stopping' : !s.running;
+ buttonLabel($('run'), running ? (isVisual && v.phase === 'stopping' ? 'Stopping…' : preparing ? 'Preparing…' : 'Running…') : 'Run episode', running);
+
+ $('camera-tabs').hidden = visual;
+ $('orbit-hint').hidden = visual;
+ const activity = $('viewer-activity');
+ const activityLabel = !s.ready ? 'Preparing scene…' : s.switching ? 'Loading scene…' :
+  running ? (preparing ? 'Loading policy…' : isVisual ? 'VLA running' : method === 'qwen' ? 'Qwen running' : 'Expert running') : '';
+ activity.hidden = !activityLabel;
+ if (activityLabel && activity.dataset.label !== activityLabel) {
+  const spinner = document.createElement('span');
+  spinner.className = 'spinner';
+  spinner.setAttribute('aria-hidden', 'true');
+  activity.replaceChildren(spinner, document.createTextNode(activityLabel));
+  activity.dataset.label = activityLabel;
+ }
+ document.querySelector('.viewer').setAttribute('aria-busy', String(running || !s.ready || Boolean(s.switching)));
+ $('mode').textContent = visual ? 'VLA · FRONT + WRIST' : usesSceneControls() && canRun ? 'PHYSICS SIMULATION' : 'SCENE PREVIEW';
 }
 function savedSummary(name,s){
  if(name==='check'&&s.oracle)return `Last completed check: ${s.oracle.successes}/${s.oracle.episodes} scenes successful.`;
@@ -103,11 +174,23 @@ function savedSummary(name,s){
  return '';
 }
 function renderPipeline(s){
- const material=s.experiment?.physics?.learning_enabled===false;document.querySelector(".pipeline").hidden=material;$("material-trial-note").hidden=!material;
- const current=uiJob(s),jobBusy=Boolean(current.running),busy=jobBusy||s.switching||s.vla?.running,history=s.jobs||{};
+ const material = s.experiment?.physics?.learning_enabled === false;
+ const showStages = !material && usesSceneControls();
+ const pipeline = document.querySelector('.pipeline');
+ pipeline.hidden = (!showStages && method !== 'vla') || !s.experiment;
+ $('pipeline-title').textContent = method === 'expert' ? 'Expert verification' : 'Learning pipeline';
+ const note = $('pipeline-note');
+ note.hidden = method !== 'vla';
+ note.textContent = !s.vla?.supported_scene ? 'Visual training currently supports the standard bowl scene.' :
+  s.vla.ready ? 'The evaluated visual policy can run above. Its development evaluation is in Reports.' :
+  'Visual training uses camera recordings and joint targets. Recording, training, and evaluation are run from the command line.';
+ $('job').hidden = !showStages;
+ pipeline.querySelector('.stages').hidden = !showStages;
+ const current=uiJob(s),visibleJob=showStages&&(!current.name?.startsWith('vla-'))&&(method==='qwen'||current.name==='check'),jobBusy=Boolean(current.running),busy=jobBusy||s.switching||s.vla?.running,history=s.jobs||{};
  const resultIds={check:'verifyText',generate:'collectText',curate:'curateText',train:'trainText',evaluate:'evalText'};
  for(const [name,id] of Object.entries(resultIds)){
   const meta=JOBS[name],card=document.querySelector(`[data-stage="${name}"]`),button=card.querySelector('button[data-job]');
+  card.hidden = !showStages || (method === 'expert' && name !== 'check');
   const record=current.name===name?current:(history[name]?.name?history[name]:{});
   const running=current.name===name&&jobBusy,status=running?'running':record.status||'idle';
   card.dataset.status=status;card.setAttribute('aria-busy',String(running));
@@ -126,7 +209,7 @@ function renderPipeline(s){
   buttonLabel(button,label,running);
   button.title=running?(progress.message||meta.working):busy?'Wait for the current stage to finish.':s.running?'Stop the live episode first.':name==='train'&&s.adapter_ready?'A saved student is already available in the Policy selector.':!ready?'Finish the preceding stages first.':meta.button;
  }
- if(!current.name){$('job').style.display='none';return}
+ if(!current.name||!visibleJob){$('job').style.display='none';return}
  const meta=JOBS[current.name]||{title:'Pipeline stage'},status=current.status||(current.running?'running':current.exit_code===0?'complete':'idle');
  $('job').style.display='block';$('job').dataset.status=status;$('job').setAttribute('aria-busy',String(jobBusy));$('job-spinner').hidden=!jobBusy;
  $('jobTitle').textContent=meta.title+(jobBusy?(current.pending?' is starting':' is running'):status==='complete'?' complete':status==='failed'?' failed':status==='cancelled'?' stopped':'');
@@ -137,58 +220,142 @@ function renderPipeline(s){
 }
 async function job(name){
  if(pendingJob||uiJob(state).running)return;
- requestError=null;pendingJob={name,id:null};renderPipeline(state);renderViewer(state);
+ requestError=null;pendingJob={name,id:null};renderWorkspace(state);
  try{const result=await post('/api/job',{name});pendingJob.id=result.job_id}
- catch(error){pendingJob=null;requestError={name,status:'failed',running:false,error:error.message};renderPipeline(state);renderViewer(state)}
+ catch(error){pendingJob=null;requestError={name,status:'failed',running:false,error:error.message};renderWorkspace(state)}
 }
 let experimentCatalog=[],pendingExperiment=null;
 const selectMeasure=document.createElement('canvas').getContext('2d');
-function fitScenePicker(){
- const picker=$('experiment-picker'),option=picker.selectedOptions[0];if(!option)return;
- selectMeasure.font=getComputedStyle(picker).font;
- const available=picker.parentElement.clientWidth-($('experiment-loading').hidden?0:24);
- picker.style.width=Math.min(Math.ceil(selectMeasure.measureText(option.textContent).width)+52,Math.max(120,available))+'px';
+function fitPickers() {
+ for (const picker of [$('experiment-picker'), methodPicker]) {
+  const option = picker.selectedOptions[0];
+  if (!option) continue;
+  selectMeasure.font = getComputedStyle(picker).font;
+  const spinnerWidth = picker.id === 'experiment-picker' && !$('experiment-loading').hidden ? 24 : 0;
+  const available = picker.parentElement.clientWidth - spinnerWidth;
+  picker.style.width = Math.min(Math.ceil(selectMeasure.measureText(option.textContent).width) + 52, Math.max(0, available)) + 'px';
+ }
 }
-addEventListener('resize',fitScenePicker);
-document.fonts?.ready.then(fitScenePicker);
-let requestedExperiment=new URLSearchParams(location.search).get('experiment');
-async function loadExperimentCatalog(){
- const r=await fetch('/api/experiments');if(!r.ok)throw Error('Could not load experiments');
- const data=await r.json();experimentCatalog=data.experiments;
- const picker=$('experiment-picker');picker.replaceChildren();
- for(const item of experimentCatalog){const option=document.createElement('option');option.value=item.id;option.textContent=item.name+(item.available===false?' · asset unavailable':'');option.disabled=item.available===false;option.title=item.unavailable_reason||'';picker.append(option)}
- picker.value=state.experiment?.id||data.active;
- fitScenePicker();
-}
-function syncExperiment(s){
- if(!s.experiment)return;
- $("policy").querySelector('option[value="expert"]').textContent=s.experiment.physics?.learning_enabled===false?"Scripted test controller":"Scripted expert";
- $("robot-label").textContent=(s.experiment.robot_name||"SO-101")+" / MuJoCo";
- if(pendingExperiment===s.experiment.id)pendingExperiment=null;
- if(s.error&&!s.switching)pendingExperiment=null;
- const switching=Boolean(s.switching||pendingExperiment),pipeline=Boolean(uiJob(s).running||s.vla?.running);
- $('experiment-picker').value=pendingExperiment||s.experiment.id;
- fitScenePicker();
- $('experiment-picker').disabled=switching||pipeline||s.running;
- $('experiment-loading').hidden=!switching;document.querySelector('.experiment-bar').setAttribute('aria-busy',String(switching));
- $('experiment-note').textContent=switching?'Loading experiment…':s.experiment.description;$('task-instructions').textContent=s.experiment.instructions;
- const prefix=s.output_url||'/outputs';
- const labUrl='/?experiment='+encodeURIComponent(s.experiment.id);document.querySelector('[data-nav="lab"]').href=labUrl;document.querySelector('.brand').href=labUrl;if(!pendingExperiment&&(!requestedExperiment||requestedExperiment===s.experiment.id))history.replaceState(null,'',labUrl);
- for(const [nav,file] of [['gallery','eval_gallery.html'],['reports','experiment_report.html']])document.querySelector(`[data-nav="${nav}"]`).href=prefix+'/'+file;
- document.querySelectorAll('footer a').forEach(a=>{const file=a.getAttribute('href').split('/').at(-1);a.href=prefix+'/'+file});
- if(!s.adapter_ready&&$('policy').value==='student')$('policy').value='expert';
- if(!s.oracle){$('expertMetric').textContent='—';$('expertCaption').textContent='Not checked for this experiment'}
- if(!s.results?.student){$('studentMetric').textContent='—';$('studentCaption').textContent='Not evaluated for this experiment'}
- if(requestedExperiment&&experimentCatalog.length){if(!experimentCatalog.some(item=>item.id===requestedExperiment))requestedExperiment="so101-bowl";const requested=requestedExperiment;requestedExperiment=null;if(requested!==s.experiment.id)selectExperiment(requested)}
-}
-async function selectExperiment(id){
- if(id===state.experiment?.id)return;
- pendingExperiment=id;syncExperiment(state);renderViewer({...state,switching:true});renderPipeline({...state,switching:true});
- try{await post('/api/experiment',{id})}catch{pendingExperiment=null;syncExperiment(state)}
-}
-loadExperimentCatalog().catch(error=>$('error').textContent=error.message);
+addEventListener('resize', fitPickers);
+document.fonts?.ready.then(fitPickers);
+let requestedExperiment = new URLSearchParams(location.search).get('experiment');
 
-async function frame(){if(loadingFrame||!state.ready)return;loadingFrame=true;try{const r=await fetch('/frame.jpg?t='+Date.now());if(!r.ok)return;let blob=await r.blob(),url=URL.createObjectURL(blob),old=$('frame').src;$('frame').src=url;$('frame').style.visibility='visible';$('loading').style.display='none';if(old.startsWith('blob:'))URL.revokeObjectURL(old)}catch{}finally{loadingFrame=false}}
+async function loadExperimentCatalog() {
+ const response = await fetch('/api/experiments');
+ if (!response.ok) throw Error('Could not load experiments');
+ const data = await response.json();
+ experimentCatalog = data.experiments;
+ const picker = $('experiment-picker');
+ picker.replaceChildren();
+ for (const item of experimentCatalog) {
+  const option = document.createElement('option');
+  option.value = item.id;
+  option.textContent = item.name + (item.available === false ? ' · asset unavailable' : '');
+  option.disabled = item.available === false;
+  option.title = item.unavailable_reason || '';
+  picker.append(option);
+ }
+ picker.value = state.experiment?.id || data.active;
+ fitPickers();
+}
+
+function syncExperiment(s) {
+ if (!s.experiment) return;
+ if (pendingExperiment === s.experiment.id || (s.error && !s.switching)) pendingExperiment = null;
+ const switching = Boolean(s.switching || pendingExperiment);
+ const locked = switching || s.running || pendingRun || pendingVla || s.vla?.running || uiJob(s).running;
+ $('experiment-picker').value = pendingExperiment || s.experiment.id;
+ $('experiment-picker').disabled = Boolean(locked);
+ $('experiment-loading').hidden = !switching;
+ methodPicker.disabled = Boolean(locked);
+ document.querySelector('.experiment-bar').setAttribute('aria-busy', String(switching));
+ $('experiment-note').textContent = switching ? 'Loading scene…' : s.experiment.description;
+ $('task-instructions').textContent = s.experiment.instructions;
+ $('robot-label').textContent = (s.experiment.robot_name || 'SO-101') + ' / MuJoCo';
+ const query = new URLSearchParams({experiment: s.experiment.id, policy: method});
+ const labUrl = '/?' + query;
+ document.querySelector('[data-nav="lab"]').href = labUrl;
+ document.querySelector('.brand').href = labUrl;
+ if (!switching && (!requestedExperiment || requestedExperiment === s.experiment.id) && location.search !== '?' + query) {
+  history.replaceState(null, '', labUrl);
+ }
+ for (const page of ['gallery', 'reports']) document.querySelector(`[data-nav="${page}"]`).href = '/' + page + '?' + query;
+ $('footer-gallery').href = '/gallery?' + query;
+ $('footer-report').href = '/reports?' + query;
+ $('footer-curation').hidden = $('footer-divider').hidden = method !== 'qwen' || s.experiment.physics?.learning_enabled === false;
+ $('footer-curation').href = (s.output_url || '/outputs') + '/curation_report.html';
+ if (requestedExperiment && experimentCatalog.length && !switching && !locked) {
+  const selected = experimentCatalog.find(item => item.id === requestedExperiment && item.available !== false)?.id || 'so101-bowl';
+  requestedExperiment = null;
+  if (selected !== s.experiment.id) selectExperiment(selected);
+ }
+ fitPickers();
+}
+
+async function selectExperiment(id) {
+ if (id === state.experiment?.id) return;
+ pendingExperiment = id;
+ renderWorkspace(state);
+ try { await post('/api/experiment', {id}); }
+ catch { pendingExperiment = null; renderWorkspace(state); }
+}
+
+function selectMethod(value, refresh = true) {
+ if (value !== method && method in seeds) seeds[method] = $('seed').value;
+ method = value;
+ methodPicker.value = value;
+ if (method in seeds) $('seed').value = seeds[method];
+ $('seed').min = method === 'vla' ? 20000 : 0;
+ $('seed').max = method === 'vla' ? 29999 : 999999;
+ $('seed-label').textContent = method === 'vla' ? 'Development scene seed' : 'Scene seed';
+ $('method-note').textContent = methodPicker.selectedOptions[0].dataset.description;
+ $('error').textContent = '';
+ if (refresh) renderWorkspace(state);
+}
+methodPicker.addEventListener('change', () => selectMethod(methodPicker.value));
+selectMethod(method, false);
+loadExperimentCatalog().catch(error => $('error').textContent = error.message);
+
+let loadingFrame = false, frameRevision = null;
+function frameSource(s) {
+ if (visualRun(s)) return {key: 'vla:' + (pendingVla ? 'pending' : s.vla?.id), visual: true};
+ return {key: 'scene:' + (pendingExperiment || s.experiment?.id), visual: false};
+}
+function syncFrame(s) {
+ const source = frameSource(s);
+ if (viewport.dataset.frameKey !== source.key) {
+  viewport.dataset.frameKey = source.key;
+  viewport.dataset.source = source.visual ? 'vla' : 'scene';
+  const image = $('frame');
+  if (image.src.startsWith('blob:')) URL.revokeObjectURL(image.src);
+  image.removeAttribute('src');
+  image.style.visibility = 'hidden';
+  image.alt = source.visual ? 'Live VLA front and wrist cameras' : 'Live robot simulation';
+  $('loading').style.display = '';
+  $('loading').lastChild.textContent = source.visual ? ' Loading visual policy…' : ' Preparing the simulation…';
+  frameRevision = null;
+ }
+}
+async function frame() {
+ const source = frameSource(state), v = state.vla;
+ if (loadingFrame || !state.ready || pendingExperiment || state.switching ||
+ (source.visual && (pendingVla || !v?.has_frame || (!v.running && frameRevision === v.frame_revision)))) return;
+ loadingFrame = true;
+ try {
+  const path = source.visual ? '/api/vla/frame.jpg' : '/frame.jpg';
+  const response = await fetch(path + '?t=' + Date.now());
+  if (!response.ok) return;
+  const blob = await response.blob();
+  if (viewport.dataset.frameKey !== source.key) return;
+  const image = $('frame'), old = image.src;
+  image.src = URL.createObjectURL(blob);
+  image.style.visibility = 'visible';
+  $('loading').style.display = 'none';
+  if (old.startsWith('blob:')) URL.revokeObjectURL(old);
+  if (source.visual) frameRevision = v.frame_revision;
+ } catch {} finally { loadingFrame = false; }
+}
+
 function updateConnection(s){
  const indicator=document.querySelector('.connection-indicator');
  const job=uiJob(s),working=s.running||s.switching||job.running||s.vla?.running;
@@ -198,11 +365,103 @@ function updateConnection(s){
  indicator.dataset.state=s.error&&!s.ready?'offline':working||!s.ready?'busy':'online';
  indicator.title=label;$('dot').classList.toggle('pulse',Boolean(working));
 }
-async function poll(){try{let r=await fetch('/api/status');if(!r.ok)throw Error('Lab unavailable');state=await r.json();syncExperiment(state);renderPlayback(state);if(!drag&&!orbitTimer&&state.orbit)orbit=state.orbit;updateConnection(state);renderViewer(state);$('student').disabled=!state.adapter_ready;$('student').textContent=state.adapter_ready?'Qwen · trained student':'Qwen · train first';let o=state.observation||{};renderPhysics(state,o);$('scene').textContent=`SEED ${state.seed}   ·   DECISION ${o.step||0}   ·   ${state.camera.toUpperCase()}${['hammer_nail','hammer_pine','impact_nail'].includes(o.task)?`   ·   NAIL ${Math.round(o.nail_depth*1000)} / ${Math.round(o.target_depth*1000)} mm`:''}`;$('step').textContent=`${o.step||0} / ${state.experiment?.simulation?.max_steps||15}`;$('result').textContent=state.result==='experiment_complete'?'Engineering trial complete · materials uncalibrated':state.success===true?(['hammer_nail','hammer_pine','impact_nail'].includes(o.task)?`✓ Nail driven ${Math.round(o.nail_depth*1000)} mm · hammer clear`:o.task==='cut_fruit'?'✓ Cut complete · knife clear':o.task==='tile_adhesive_bedding'?'✓ Adhesive and bedding complete · reduced model':o.task==='tile_dry_transfer'?'✓ Four dry tiles placed · installation materials pending':'✓ Placement completed successfully'):state.success===false?'Episode ended · '+state.result:state.running?'Executing '+(state.history.at(-1)?.action||'first action'):'Ready to explore';if(state.error){$('error').textContent=state.error;pendingRun=false;renderViewer(state)}
-let trace=state.history||[];$('actions').replaceChildren();if(!trace.length){let li=document.createElement('li');li.textContent='Run an episode to see each decision.';$('actions').append(li)}trace.forEach((a,i)=>{let li=document.createElement('li'),n=document.createElement('span'),v=document.createElement('span');n.className='num';n.textContent=String(i+1).padStart(2,'0');v.textContent=actionLabel(a);li.append(n,v);$('actions').append(li)});$('actions').scrollTop=$('actions').scrollHeight;
-if(state.oracle){$('expertMetric').textContent=`${state.oracle.successes}/${state.oracle.episodes}`;$('expertCaption').textContent='Randomized scene check'}
-if(state.results?.student){const r=state.results.student;$('studentMetric').textContent=`${r.successes}/${r.episodes}`;$('studentCaption').textContent=r.complete_benchmark?'100 held-out scenes':'Partial evaluation'}
-renderPipeline(state);if(typeof renderVla==='function')renderVla(state);await frame()}catch(e){$('connection').textContent='Reconnecting to lab…';document.querySelector('.connection-indicator').dataset.state='offline';$('dot').classList.remove('pulse')}finally{setTimeout(poll,700)}}poll();setInterval(frame,110);
+function renderMeasurements(s) {
+ const expert = s.oracle, student = s.results?.student;
+ const visual = method === 'vla' && s.vla?.ready && s.vla?.supported_scene ?
+  s.vla.candidates?.[0]?.evaluation : null;
+ const skillTrial = s.experiment?.physics?.learning_enabled === false;
+ $('metrics-card').hidden = !(visual || (usesSceneControls() && !skillTrial));
+ $('expert-metric').hidden = method === 'vla';
+ $('student-metric').hidden = method === 'expert';
+ $('expertMetric').textContent = expert ? `${expert.successes}/${expert.episodes}` : '—';
+ $('expertCaption').textContent = expert ? 'Randomized scene check' : 'Expert check pending';
+ $('student-metric-label').textContent = visual ? 'VISUAL POLICY' : 'STUDENT TEST';
+ $('studentMetric').textContent = visual ? `${visual.unseen_successes}/${visual.unseen_episodes}` :
+  student ? `${student.successes}/${student.episodes}` : '—';
+ $('studentCaption').textContent = visual ? 'Unseen development scenes' : student ?
+  (student.complete_benchmark ? '100 held-out scenes' : 'Partial evaluation') : 'Evaluation pending';
+ $('metrics-note').hidden = method !== 'qwen';
+}
+
+function renderEpisode(s) {
+ const o = s.observation || {}, v = s.vla || {};
+ const visual = visualRun(s);
+ const match = usesSceneControls() && s.policy === currentPolicy();
+ const hammer = ['hammer_nail','hammer_pine','impact_nail'].includes(o.task);
+ const suffix = hammer && usesSceneControls() ? ` · NAIL ${Math.round(o.nail_depth*1000)} / ${Math.round(o.target_depth*1000)} mm` : '';
+ $('trace-card').hidden = !usesSceneControls();
+ $('run-report').hidden = !(visualEpisode(s) && v.report_url && !pendingVla);
+ if (!$('run-report').hidden) $('run-report').href = v.report_url;
+ $('scene').textContent = visual ? (pendingVla || !v.has_frame ? 'Preparing policy cameras' :
+  `SEED ${v.seed} · TICK ${v.tick || 0} / ${v.max_ticks || 240}`) :
+  s.ready ? `SEED ${s.seed} · ${match ? 'DECISION ' + (o.step || 0) + ' · ' : ''}${s.camera?.toUpperCase() || 'FRONT'}${suffix}` : 'Waiting for scene';
+ let message = '';
+ if (visualEpisode(s)) {
+  message = pendingVla || v.phase === 'loading' ? 'Loading visual policy…' : v.phase === 'stopping' ? 'Stopping…' :
+   v.running ? ('Executing joint targets' + (typeof v.inference_ms === 'number' ? ` · ${v.inference_ms.toFixed(0)} ms last inference` : '')) : v.phase === 'failed' ? (v.error || 'The rollout failed.') :
+   v.phase === 'stopped' ? 'Episode stopped.' : v.success ? 'Placement completed.' :
+   'Placement not completed · ' + String(v.outcome || 'episode ended').replaceAll('_', ' ');
+ } else if (match) {
+  message = s.result === 'experiment_complete' ? 'Engineering trial complete · materials uncalibrated' : s.success === true ?
+   (hammer ? `✓ Nail driven ${Math.round(o.nail_depth*1000)} mm · hammer clear` :
+    o.task === 'cut_fruit' ? '✓ Cut complete · knife clear' : o.task === 'tile_adhesive_bedding' ? '✓ Adhesive and bedding complete · reduced model' :
+    o.task === 'tile_dry_transfer' ? '✓ Four dry tiles placed · installation materials pending' : '✓ Placement completed successfully') :
+   s.success === false ? 'Episode ended · ' + s.result : s.running ? 'Executing ' + (s.history.at(-1)?.action || 'first action') : '';
+ }
+ $('result').textContent = message;
+ $('step').textContent = `${match ? o.step || 0 : 0} / ${s.experiment?.simulation?.max_steps || 15}`;
+ const trace = match ? s.history || [] : [];
+ $('actions').replaceChildren();
+ if (!trace.length) {
+  const item = document.createElement('li');
+  item.textContent = 'Run an episode to see each decision.';
+  $('actions').append(item);
+ }
+ trace.forEach((action, i) => {
+  const item = document.createElement('li'), n = document.createElement('span'), value = document.createElement('span');
+  n.className = 'num';
+  n.textContent = String(i + 1).padStart(2, '0');
+  value.textContent = actionLabel(action);
+  item.append(n, value);
+  $('actions').append(item);
+ });
+ $('actions').scrollTop = $('actions').scrollHeight;
+}
+
+function renderWorkspace(s) {
+ syncExperiment(s);
+ renderViewer(s);
+ renderPlayback(s);
+ renderPipeline(s);
+ renderMeasurements(s);
+ renderEpisode(s);
+ renderPhysics(s, s.observation || {});
+ syncFrame(s);
+}
+
+async function poll() {
+ try {
+  const response = await fetch('/api/status');
+  if (!response.ok) throw Error('Lab unavailable');
+  state = await response.json();
+  if (state.running || state.error) pendingRun = false;
+  if (state.vla?.running && method !== 'vla') selectMethod('vla');
+  if (state.running && !state.vla?.running && method !== (state.policy === 'student' ? 'qwen' : 'expert')) {
+   selectMethod(state.policy === 'student' ? 'qwen' : 'expert');
+  }
+  if (!drag && !orbitTimer && state.orbit) orbit = state.orbit;
+  if (state.error) $('error').textContent = state.error;
+  updateConnection(state);
+  renderWorkspace(state);
+  await frame();
+ } catch {
+  $('connection').textContent = 'Reconnecting to lab…';
+  document.querySelector('.connection-indicator').dataset.state = 'offline';
+  $('dot').classList.remove('pulse');
+ } finally { setTimeout(poll, 700); }
+}
+poll();
+setInterval(frame, 110);
 
 function renderPhysics(s,o){
  const card=$('physics-card');card.hidden=!s.experiment?.physics;if(card.hidden)return;

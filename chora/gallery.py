@@ -57,7 +57,7 @@ CSS="""
 
 SCRIPT="""
 const gallery=JSON.parse(document.getElementById('episode-data').textContent);
-let policy=gallery.policies.student?'student':Object.keys(gallery.policies)[0],outcome='all';
+let policy=gallery.initial || (gallery.policies.student?'student':Object.keys(gallery.policies)[0]),outcome='all';
 const titles={student:'trained student',base:'untrained baseline',expert:'scripted expert'};
 function filterWall(nextPolicy=policy,nextOutcome=outcome){
  policy=nextPolicy;outcome=nextOutcome;let shown=0,clips=0;
@@ -92,10 +92,12 @@ filterWall();
 """
 
 
-def build_gallery(results,output=None):
-    output=output or OUTPUT
-    tiles=[];data={"policies":results,"episodes":{}}
-    for policy in ("student","base","expert"):
+def render_gallery(results, output, experiment=None, method=None):
+    modes = ("expert",) if method == "expert" else ("student", "base", "expert")
+    initial = {"expert": "expert", "qwen": "student"}.get(method)
+    tiles=[];data={"policies":{key: results[key] for key in modes if key in results},
+                   "episodes":{}, "initial":initial}
+    for policy in modes:
         for e in read_json(output/"evaluation"/policy/"episodes.json",[]):
             key=f"{policy}-{e['seed']}";passed=e["success"];thumbnail=e.get("thumbnail");video=e.get("video")
             data["episodes"][key]={"policy":policy,"seed":e["seed"],"success":passed,"thumbnail":thumbnail,"video":video,"result":e["final_observation"]["last_result"],"steps":[{"action":s["action"],"result":s["result"]} for s in e["steps"]]}
@@ -104,10 +106,19 @@ def build_gallery(results,output=None):
             tiles.append(f'<button class="episode-tile {"success" if passed else "failure"}" data-policy="{policy}" data-success="{str(passed).lower()}" data-key="{key}" data-video="{str(bool(video)).lower()}" aria-label="{policy}, seed {e["seed"]}, {"success" if passed else "failure"}. {"Watch recording" if video else "View final state"}">{image}{movie}<span class="outcome-badge {"ok" if passed else "fail"}" aria-hidden="true">{"✓" if passed else "×"}</span><span class="tile-seed">{e["seed"]}</span></button>')
     controls=[]
     for policy,label in (("student","Trained student"),("base","Untrained baseline"),("expert","Scripted expert")):
-        disabled='' if policy in results else ' disabled title="Not evaluated yet. This baseline measures Qwen before fine-tuning."'
+        if policy not in modes:
+            continue
+        disabled='' if policy in results else ' disabled title="Not evaluated yet."'
         controls.append(f'<button data-wall-policy="{policy}" aria-pressed="false" onclick="filterWall(\'{policy}\',outcome)"{disabled}>{label}</button>')
     payload=json.dumps(data,separators=(',',':'),ensure_ascii=False).replace('&','\\u0026').replace('<','\\u003c').replace('>','\\u003e')
-    baseline_note='' if 'base' in results else '<p class="baseline-note">The untrained baseline has not been evaluated for this experiment yet.</p>'
-    body='<main><div class="gallery-intro"><div class="eyebrow">Evaluation / episode wall</div><h1>Every scene. Every <em>outcome</em>.</h1><p>The trained student is fine-tuned Qwen; the scripted expert is its programmed teacher. The untrained baseline measures Qwen before fine-tuning.</p>'+baseline_note+'</div><section aria-labelledby="wall-title"><div class="episode-wall-heading"><h2 id="wall-title">Evaluation episodes</h2><div class="wall-controls"><div class="pill-group" role="group" aria-label="Policy">'+''.join(controls)+'</div><div class="pill-group" role="group" aria-label="Outcome"><button id="all-outcomes" data-wall-outcome="all" aria-pressed="true" onclick="filterWall(policy,\'all\')">All</button><button data-wall-outcome="true" aria-pressed="false" onclick="filterWall(policy,\'true\')">Successes</button><button data-wall-outcome="false" aria-pressed="false" onclick="filterWall(policy,\'false\')">Failures</button></div></div></div><div class="episode-wall">'+''.join(tiles)+'</div><p class="wall-empty" id="wall-empty" hidden>No episodes match this filter.</p><p class="wall-caption" id="wall-caption" aria-live="polite"></p></section></main>'
+    baseline_note='' if method == 'expert' or 'base' in results else '<p class="baseline-note">The untrained baseline has not been evaluated for this experiment yet.</p>'
+    description = ('Recorded outcomes from the scripted expert.' if method == 'expert' else
+                   'Compare Qwen with the scripted expert. The untrained baseline measures Qwen before fine-tuning.')
+    body='<main><div class="gallery-intro"><div class="eyebrow">Evaluation / episode wall</div><h1>Every scene. Every <em>outcome</em>.</h1><p>'+description+'</p>'+baseline_note+'</div><section aria-labelledby="wall-title"><div class="episode-wall-heading"><h2 id="wall-title">Evaluation episodes</h2><div class="wall-controls"><div class="pill-group" role="group" aria-label="Policy">'+''.join(controls)+'</div><div class="pill-group" role="group" aria-label="Outcome"><button id="all-outcomes" data-wall-outcome="all" aria-pressed="true" onclick="filterWall(policy,\'all\')">All</button><button data-wall-outcome="true" aria-pressed="false" onclick="filterWall(policy,\'true\')">Successes</button><button data-wall-outcome="false" aria-pressed="false" onclick="filterWall(policy,\'false\')">Failures</button></div></div></div><div class="episode-wall">'+''.join(tiles)+'</div><p class="wall-empty" id="wall-empty" hidden>No episodes match this filter.</p><p class="wall-caption" id="wall-caption" aria-live="polite"></p></section></main>'
     body+='<dialog id="episode-dialog" aria-labelledby="episode-title"><div class="episode-modal-header"><h2 id="episode-title">Episode</h2><button class="secondary" onclick="document.getElementById(\'episode-dialog\').close()" aria-label="Close episode">×</button></div><div class="episode-media"><video id="episode-video" controls playsinline hidden></video><img id="episode-image" alt="Episode final state" hidden><div class="episode-loading" id="episode-loading" hidden><span class="spinner" aria-hidden="true"></span>Loading recording…</div></div><div class="episode-info"><p id="episode-description"></p><details><summary>Action trace</summary><pre id="episode-trace"></pre></details></div></dialog><script id="episode-data" type="application/json">'+payload+'</script>'
-    (output/"eval_gallery.html").write_text(page("Evaluation gallery",body,"gallery",CSS,SCRIPT))
+    return page("Evaluation gallery", body, "gallery", CSS, SCRIPT, experiment=experiment, policy=method)
+
+
+def build_gallery(results, output=None):
+    output = output or OUTPUT
+    (output / "eval_gallery.html").write_text(render_gallery(results, output))

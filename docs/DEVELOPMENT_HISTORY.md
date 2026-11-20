@@ -192,3 +192,12 @@ or validated real material behavior.
 - Restricted UI execution to the single qualifying model; direct requests cannot
   launch a failed diagnostic checkpoint. This does not change the failed VLA's
   task performance or claim a working controller.
+
+
+## 2026-11-20 — Select control methods in the lab
+
+- Put Scene and Control method together. The expert, Qwen and VLA use the same
+  simulation workspace. Method selection determines available controls and
+  which results the gallery and reports show.
+- Added status displays for planned visual inspection and skill orchestration.
+  Removed the separate visual-policy panel and the stale HTML lab snapshot.

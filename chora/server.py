@@ -12,6 +12,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs
 
 from .playback import PlaybackClock, validate_speed
 from .common import OUTPUT, ROOT, read_json
@@ -255,25 +256,35 @@ def serve(port=8765):
             except (BrokenPipeError,ConnectionResetError): pass
         def do_GET(self):
             if not self.local_request():return
-            path = self.path.split("?")[0]
+            path, _, query = self.path.partition("?")
             if path=='/materials/tiling':
                 from .tiling_workbench import render
                 return self.respond(render(),'text/html; charset=utf-8')
             if path=='/api/tiling-materials':
-                from urllib.parse import urlsplit,parse_qs
                 from .tiling_materials import catalog as materials,workbench,reference_panel
                 try:
-                    args=parse_qs(urlsplit(self.path).query)
+                    args=parse_qs(query)
                     if set(args)-{'age_s','exposure_s','speed_m_s','gap_m'}:raise ValueError('Unknown material parameter')
                     prediction=workbench(**{k:float(v[-1]) for k,v in args.items()})
                     return self.respond(dict(catalog=materials(),prediction=prediction,reference_panel=reference_panel()))
                 except (ValueError,TypeError) as e:return self.respond({'error':str(e)},status=400)
-            if path=="/":
-                from .ui import render_shell
-                return self.respond(render_shell((WEB/"lab-template.html").read_text(),experiment=lab.experiment),"text/html; charset=utf-8")
+            if path in {"/", "/gallery", "/reports"}:
+                from .ui import control_method, policy_results, render_shell
+                args = parse_qs(query)
+                policy = control_method(args.get("policy", ["expert"])[0])
+                if path == "/":
+                    html = render_shell((WEB / "lab-template.html").read_text(),
+                                        experiment=lab.experiment, policy=policy)
+                else:
+                    experiment = args.get("experiment", [lab.experiment])[0]
+                    if experiment not in {item["id"] for item in catalog()}:
+                        return self.respond({"error": "Unknown scene"}, status=404)
+                    visual = lab.vla.status() if policy == "vla" and experiment == DEFAULT else None
+                    html = policy_results(experiment, policy, path.lstrip("/"), visual)
+                return self.respond(html, "text/html; charset=utf-8")
             if path.startswith("/static/"):
                 name=path[len("/static/"):]
-                if name in {"app.css","appearance-core.js","appearance-ui.js","lab.js","vla.js","logo-octahedron.svg"}:
+                if name in {"app.css","appearance-core.js","appearance-ui.js","lab.js","logo-octahedron.svg"}:
                     file=WEB/name
                     return self.respond(file.read_bytes(),mimetypes.guess_type(file)[0] or "application/octet-stream")
             if path=="/api/experiments":

@@ -143,8 +143,9 @@ and benchmark claims separate by task.
 `chora/web/lab-template.html` and `lab.js` define the lab. Shared navigation,
 appearance controls and `logo-octahedron.svg` are assembled through `chora/ui.py`.
 CSS and JavaScript load through `/static/`. Reports refresh their navigation and
-appearance components from the same source. `index.html` is a generated snapshot;
-`python -m chora report` refreshes generated report/gallery artifacts.
+appearance components from the same source. The scene and control method in the
+lab URL carry through to Gallery and Reports. `python -m chora report` refreshes
+the generated report and gallery artifacts.
 
 ## Runtime diagnostics
 
