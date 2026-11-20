@@ -410,7 +410,8 @@ function renderEpisode(s) {
  const visual = visualRun(s);
  const match = usesSceneControls() && s.policy === currentPolicy();
  const hammer = ['hammer_nail','hammer_pine','impact_nail'].includes(o.task);
- const suffix = hammer && usesSceneControls() ? ` · NAIL ${Math.round(o.nail_depth*1000)} / ${Math.round(o.target_depth*1000)} mm` : '';
+ const suffix = hammer && usesSceneControls() ? ` · NAIL ${Math.round(o.nail_depth*1000)} / ${Math.round(o.target_depth*1000)} mm` :
+  o.target_velocity ? ` · PLATFORM ${Math.round(Math.abs(o.target_velocity[1])*1000)} mm/s` : '';
  $('trace-card').hidden = !usesSceneControls();
  $('run-report').hidden = !(visualEpisode(s) && v.report_url && !pendingVla);
  if (!$('run-report').hidden) $('run-report').href = v.report_url;

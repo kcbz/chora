@@ -138,6 +138,24 @@ a shared collision world and coordinated actions. Register implemented adapters
 in `chora/experiments.py` and the simulator/controller factories. Keep outputs
 and benchmark claims separate by task.
 
+## Bowl scenes and their students
+
+- **Standard platform** is the original fixed-target scene and uses the existing
+  trained Qwen adapter.
+- **Raised shelf** places the goal on a 95 mm shelf with a longer carry from the
+  pickup zone. The expert lifts the bowl higher to clear the shelf.
+- **Moving platform** uses a motorized slide with up to 32 mm of travel to either
+  side of center. The marked goal moves with the platform. A successful release
+  stays upright, fully inside the goal, and stable relative to the platform
+  throughout the settle check. The structured observation includes the measured
+  platform velocity and a predicted goal position to plan the release.
+
+Each scene has separate demonstrations, adapters, and evaluation results. In the
+lab, select **Qwen · State-based imitation** and choose **Go to training**. Pass
+the expert check, collect and curate demonstrations, then train the student.
+After training, **Run episode** becomes available. **Evaluate student** measures
+generalization on reserved scenes.
+
 ## UI architecture
 
 `chora/web/lab-template.html` and `lab.js` define the lab. Shared navigation,

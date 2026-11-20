@@ -23,6 +23,7 @@ from .actions import decode_actions
 from .env import BowlTickEnv
 from .model import load_checkpoint, preprocess_rgb
 from .record import provenance
+from .recording_compat import match_standard_bowl_sources
 from .train import sync
 
 
@@ -58,6 +59,7 @@ def verify_recording_contract(env, source, expected):
     current = provenance(env)
     current.pop("fingerprint")
     current["max_ticks"] = source["max_ticks"]
+    match_standard_bowl_sources(current["source_hashes"], source["source_hashes"])
     if source["fingerprint"] != expected or digest(current) != expected:
         raise ValueError("Recording physics/runtime provenance changed")
 

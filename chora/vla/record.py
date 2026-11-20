@@ -13,6 +13,7 @@ import numpy as np
 
 from ..common import OUTPUT, ROOT
 from .env import BowlTickEnv, TickExpert
+from .recording_compat import match_standard_bowl_sources
 
 PROTOCOL = "chora-visual-bowl-ticks-v1"
 
@@ -132,7 +133,9 @@ def replay(path):
                       image_size=manifest["image_size"], max_ticks=manifest["max_ticks"])
     try:
         current = provenance(env)
-        if current["fingerprint"] != manifest["fingerprint"]:
+        current.pop("fingerprint")
+        match_standard_bowl_sources(current["source_hashes"], manifest["source_hashes"])
+        if hashlib.sha256(json.dumps(current, sort_keys=True).encode()).hexdigest() != manifest["fingerprint"]:
             raise ValueError("Simulation, source or runtime provenance changed; regenerate the pilot")
         with np.load(path, allow_pickle=False) as data:
             obs = env.reset(metadata["seed"])

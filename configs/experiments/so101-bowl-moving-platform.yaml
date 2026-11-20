@@ -1,0 +1,14 @@
+id: so101-bowl-moving-platform
+name: "Bowl · Moving platform"
+description: "Place the bowl on a motorized platform that slides side to side. It must stay upright and inside the marked area as the platform continues moving."
+robot: so101
+task: bowl_pick_place
+simulation:
+  table_center: [0.18, 0.09]
+  table_height: 0.05
+  target: [0.18, 0.09, 0.05]
+  spawn_y: [-0.105, -0.052]
+  target_half_size: [0.043, 0.046]
+  platform_motion:
+    travel: 0.032
+    peak_speed: [0.016, 0.024]

@@ -1,0 +1,12 @@
+id: so101-bowl-raised-shelf
+name: "Bowl · Raised shelf"
+description: "Lift the bowl to a 95 mm landing shelf farther across the arm. The pickup zone sits farther from the shelf than in the standard scene."
+robot: so101
+task: bowl_pick_place
+simulation:
+  table_center: [0.155, 0.125]
+  table_height: 0.095
+  table_style: shelf
+  target: [0.155, 0.125, 0.095]
+  spawn_x: [0.165, 0.205]
+  spawn_y: [-0.118, -0.085]

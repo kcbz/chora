@@ -61,15 +61,44 @@ def build_model(cfg, *, policy_cameras=False):
     w.add_geom(name="pedestal", type=mujoco.mjtGeom.mjGEOM_BOX, pos=[0, 0, .06], size=[.046, .045, .06], rgba=[.20, .25, .25, 1])
     h = cfg["table_height"]
     table_x,table_y=cfg.get("table_center",[.175,.09])
-    w.add_geom(name="table", type=mujoco.mjtGeom.mjGEOM_BOX, pos=[table_x,table_y,h/2], size=[.083, .074, h/2], rgba=[.33, .39, .37, 1])
+    motion = cfg.get("platform_motion")
+    table = w
+    lower = 0.
     tx, ty, _ = cfg["target"]
+    if motion:
+        # The platform and outline share a real one-axis carriage. The arm
+        # never drives or attaches the bowl directly to the carriage.
+        travel = motion["travel"]
+        lower = .012
+        table = w.add_body(name="target_platform", pos=[table_x, table_y, 0])
+        table.add_joint(name="platform_slide", type=mujoco.mjtJoint.mjJNT_SLIDE,
+                        axis=[0, 1, 0], range=[-travel-.003, travel+.003], damping=3.)
+        drive = s.add_actuator(name="platform_drive", target="platform_slide",
+                               trntype=mujoco.mjtTrn.mjTRN_JOINT)
+        drive.set_to_position(kp=4000., kv=110.)
+        for dx in (-.050, .050):
+            w.add_geom(name=f"platform_rail_{dx:+.3f}", type=mujoco.mjtGeom.mjGEOM_BOX,
+                       pos=[table_x+dx, table_y, .005], size=[.006, .082+travel, .005],
+                       rgba=[.27,.32,.36,1], contype=0, conaffinity=0)
+        tx, ty = tx - table_x, ty - table_y
+        table_x = table_y = 0.
+    elif cfg.get("table_style") == "shelf":
+        lower = h - .018
+        for dx in (-.065, .065):
+            for dy in (-.055, .055):
+                w.add_geom(type=mujoco.mjtGeom.mjGEOM_BOX,
+                           pos=[table_x+dx, table_y+dy, lower/2],
+                           size=[.009,.009,lower/2], rgba=[.25,.32,.37,1])
+    table.add_geom(name="table", type=mujoco.mjtGeom.mjGEOM_BOX,
+                   pos=[table_x,table_y,(h+lower)/2], size=[.083,.074,(h-lower)/2],
+                   rgba=[.33,.39,.37,1], **({"mass":1.} if motion else {}))
     hx, hy = cfg["target_half_size"]
     for axis in range(2):
         for sign in [-1, 1]:
             p = [tx, ty, h+.0003]
             p[axis] += sign*[hx, hy][axis]
             size = [.001, hy, .0003] if axis == 0 else [hx, .001, .0003]
-            w.add_geom(type=mujoco.mjtGeom.mjGEOM_BOX, pos=p, size=size, rgba=[.64, .88, .50, 1], contype=0, conaffinity=0)
+            table.add_geom(type=mujoco.mjtGeom.mjGEOM_BOX, pos=p, size=size, rgba=[.64, .88, .50, 1], contype=0, conaffinity=0)
     bowl = w.add_body(name="bowl", pos=[.18, -.08, .004])
     bowl.add_freejoint(name="bowl_free")
     if cfg.get("object_kind","bowl")=="bowl":
@@ -139,6 +168,15 @@ class Simulation:
         self.bowl_address = self.model.joint("bowl_free").qposadr[0]
         self.bowl_dof = self.model.joint("bowl_free").dofadr[0]
         self.arm_bodies = set(range(1, self.bowl_id))
+        self.platform_motion = self.cfg.get("platform_motion")
+        self.platform_body = None
+        if self.platform_motion:
+            joint = self.model.joint("platform_slide")
+            self.platform_qpos = int(joint.qposadr[0])
+            self.platform_dof = int(joint.dofadr[0])
+            self.platform_actuator = self.model.actuator("platform_drive").id
+            self.platform_body = self.model.body("target_platform").id
+            self.arm_bodies.remove(self.platform_body)
         self.on_frame = None
         self.frame_stride = 10
         self.reset(0)
@@ -150,6 +188,16 @@ class Simulation:
     @property
     def bowl(self):
         return self.data.xpos[self.bowl_id].copy()
+
+    @property
+    def target(self):
+        if not self.platform_motion:
+            return self.cfg["target"]
+        x, y, z = self.cfg["target"]
+        return [x, y + float(self.data.qpos[self.platform_qpos]), z]
+
+    def _platform_reference(self, time):
+        return self.platform_motion["travel"] * math.sin(self.platform_phase + self.platform_omega * time)
 
     def solve_ik(self, target, initial=None):
         target = np.array(target, float)
@@ -185,7 +233,13 @@ class Simulation:
             raise RuntimeError("Home pose is unreachable")
         self.data.qpos[:5] = home
         self.data.qpos[5] = OPEN
-        self.data.ctrl[:] = self.data.qpos[:6]
+        self.data.ctrl[:6] = self.data.qpos[:6]
+        if self.platform_motion:
+            self.platform_phase = self.rng.uniform(-math.pi, math.pi)
+            self.platform_omega = self.rng.uniform(*self.platform_motion["peak_speed"]) / self.platform_motion["travel"]
+            offset = self._platform_reference(0.)
+            self.data.qpos[self.platform_qpos] = offset
+            self.data.ctrl[self.platform_actuator] = offset
         self.gripper_open = True
         self.step_index = 0
         self.result = "reset"
@@ -200,6 +254,8 @@ class Simulation:
 
     def _advance(self, seconds):
         for _ in range(round(seconds/self.model.opt.timestep)):
+            if self.platform_motion:
+                self.data.ctrl[self.platform_actuator] = self._platform_reference(self.data.time)
             mujoco.mj_step(self.model, self.data)
             self.physics_steps += 1
             if self.on_frame is not None and self.physics_steps % self.frame_stride == 0:
@@ -213,9 +269,18 @@ class Simulation:
         grasped = not self.gripper_open and any(self.bowl_id in pair and any(b in self.arm_bodies for b in pair) for pair in self.contacts())
         observation={"bowl": [round(float(x),4) for x in self.bowl],
                 "bowl_yaw": round(math.atan2(rot[1,0],rot[0,0]),3),
-                "target": self.cfg["target"], "target_half_size": self.cfg["target_half_size"],
+                "target": self.target, "target_half_size": self.cfg["target_half_size"],
                 "tcp": [round(float(x),4) for x in self.tcp], "gripper_open": self.gripper_open,
                 "grasped": grasped, "step": self.step_index, "last_result": self.result}
+        if self.platform_motion:
+            # Look ahead by the time for a descent, settle and initial opening.
+            # This uses the commanded rail motion, which is known to both policies.
+            lead_time = self.cfg["move_seconds"] + .12 + .10
+            x, y, z = self.cfg["target"]
+            prediction = y + self._platform_reference(self.data.time + lead_time)
+            observation["target"] = [round(v, 4) for v in observation["target"]]
+            observation["target_at_release"] = [x, round(prediction, 4), z]
+            observation["target_velocity"] = [0., round(float(self.data.qvel[self.platform_dof]), 4), 0.]
         if self.object_kind!="bowl":
             observation["object"]=observation.pop("bowl")
             observation["object_yaw"]=observation.pop("bowl_yaw")
@@ -224,13 +289,19 @@ class Simulation:
 
     def is_placed(self):
         p = self.bowl
-        t = self.cfg["target"]
+        t = self.target
         half = np.array(self.cfg["target_half_size"])
         # The entire bowl must fit inside the marked region.
         inside = np.all(np.abs(p[:2]-t[:2])+self.object_radius < half)
         upright = self.data.xmat[self.bowl_id].reshape(3,3)[2,2] > math.cos(math.radians(15))
         resting = abs(p[2]-(t[2]+self.object_rest_height)) < .006
-        slow = np.linalg.norm(self.data.qvel[self.bowl_dof:self.bowl_dof+6]) < .025
+        velocity = self.data.qvel[self.bowl_dof:self.bowl_dof+6]
+        if self.platform_motion:
+            velocity = velocity.copy()
+            velocity[1] -= self.data.qvel[self.platform_dof]
+            resting = resting and any(self.bowl_id in pair and self.platform_body in pair
+                                      for pair in self.contacts())
+        slow = np.linalg.norm(velocity) < .025
         touching = any(self.bowl_id in pair and any(b in self.arm_bodies for b in pair) for pair in self.contacts())
         return bool(inside and upright and resting and slow and self.gripper_open and not touching)
 
@@ -273,7 +344,9 @@ class Simulation:
                         self._advance(self.cfg["move_seconds"]/n)
                         # Contact with the bowl is necessary for physical grasping.
                         # Arm contact with the table/floor aborts the move.
-                        if any(0 in pair and any(b in self.arm_bodies and b != self.model.body("base").id for b in pair) for pair in self.contacts()):
+                        if any((0 in pair or (self.platform_body is not None and self.platform_body in pair))
+                               and any(b in self.arm_bodies and b != self.model.body("base").id for b in pair)
+                               for pair in self.contacts()):
                             self.data.ctrl[:5] = self.data.qpos[:5]
                             self.result = "collision"
                             self.collision_count += 1

@@ -29,7 +29,8 @@ def rollout(sim, policy, seed, timing=False):
                 steps[-1]["raw_model_output"] = policy.last_text
         history.append(action)
     path = sum(np.linalg.norm(np.array(b["observation"]["tcp"])-a["observation"]["tcp"]) for a,b in zip(steps,steps[1:]))
-    margin = min(np.array(sim.cfg["target_half_size"])-np.abs(sim.bowl[:2]-sim.cfg["target"][:2])-sim.object_radius)
+    target = sim.target if sim.cfg.get("platform_motion") else sim.cfg["target"]
+    margin = min(np.array(sim.cfg["target_half_size"])-np.abs(sim.bowl[:2]-target[:2])-sim.object_radius)
     episode={"seed":seed,"success":sim.success,"steps":steps,"final_observation":obs,
             "path_length":float(path),"placement_margin":float(margin),"collisions":sim.collision_count}
     if obs.get("task") in {"hammer_nail","hammer_pine","impact_nail"}:

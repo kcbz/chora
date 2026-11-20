@@ -208,3 +208,14 @@ or validated real material behavior.
   linked the run controls to the learning pipeline for trainable scenes.
 - Fixed episode media links in scoped galleries by resolving them against the
   scene's output folder. Missing media leaves the outcome and action trace visible.
+
+
+## 2026-11-20 — Distinct bowl scenes and full-width viewer
+
+- Replaced the two similar variants in the picker with a 95 mm shelf and a
+  moving landing platform. Both experts completed 50 of 50 check episodes.
+- The carriage has a simulated slide joint and the scorer checks the bowl
+  relative to the moving target. Standard expert/Qwen traces still replay.
+  All 53 archived standard-scene VLA rollouts passed physics replay.
+- Matched the viewport to the scene feed's aspect ratio so the image fills the
+  card without cropping.

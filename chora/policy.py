@@ -30,6 +30,9 @@ class Expert:
             self.grasp_offset = -radial*BOWL_RADIUS
             self.place = np.array(obs["target"],float)
             self.place[:2] += self.rng.uniform([-.006,-.004],[.006,.004])
+            self.height = max(self.height, self.place[2] + .052)
+        if self.phase in (4, 5) and "target_at_release" in obs:
+            self.place = np.array(obs["target_at_release"], float)
         p = b.copy()
         p[:2] += self.grasp_offset
         p[2] = .022
@@ -125,7 +128,7 @@ SYSTEM = ('Control an SO-101 robot to place the bowl fully inside the target, up
 
 def to_mm(value):
     result = dict(value)
-    for key in ("bowl","object","tcp","actual_tool_tip","blade_edge","target","target_half_size"):
+    for key in ("bowl","object","tcp","actual_tool_tip","blade_edge","target","target_half_size","target_at_release","target_velocity"):
         if key in result:
             result[key] = [round(x*1000) for x in result[key]]
     for key in ("x","y","z","depth","nail_depth","target_depth","food_height"):
@@ -155,6 +158,10 @@ def messages(obs, history, action=None):
                 '{"action":"retract"}, {"action":"done"}. Align above the fruit at target z + food_height + 3 mm. '
                 'Slice down through it at duration 1.4 seconds, then retract and finish. Slice depth 5..55 mm, duration 0.5..3 seconds. '
                 'Inspect cut_complete and tool_held; a cut requires sufficient penetration and fracture work.')
+    elif "target_at_release" in obs:
+        system += (' The platform slides sideways. Target is its current center, target_velocity is in mm/s, '
+                   'and target_at_release projects its center after a descent and opening. '
+                   'Use the projected center to plan the release, preserving the offset from bowl center to gripper.')
     elif obs.get("object_kind"):
         label="construction part" if obs["object_kind"]=="part" else "ingredient portion"
         system=system.replace("bowl",label).replace("Grasp the near rim","Grasp the object from above")

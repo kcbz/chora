@@ -5,7 +5,7 @@ import pytest
 from chora import experiments
 from chora.episodes import rollout
 from chora.policy import make_expert, messages
-from chora.sim import Simulation
+from chora.sim import Simulation, make_simulation
 
 
 def test_fixed_scenes_replace_copy_creation(tmp_path,monkeypatch):
@@ -13,7 +13,9 @@ def test_fixed_scenes_replace_copy_creation(tmp_path,monkeypatch):
     scenes=experiments.catalog()
     assert [s['id'] for s in scenes]==list(experiments.FIXED_SCENES)
     bowls=[s for s in scenes if s['task']=='bowl_pick_place']
-    assert len(bowls)==3
+    assert {scene["id"] for scene in bowls} == {
+        experiments.DEFAULT, "so101-bowl-raised-shelf", "so101-bowl-moving-platform",
+    }
     assert len({s['simulation']['table_height'] for s in bowls})==3
     assert len({tuple(s['simulation'].get('table_center',[.175,.09])) for s in bowls})==3
     monkeypatch.setattr(experiments,'PRESETS',tmp_path)
@@ -65,3 +67,19 @@ def test_unlicensed_local_knife_is_explicitly_unavailable_in_a_clean_workspace(t
     assert definition['available'] is False
     assert 'local-only knife' in definition['unavailable_reason']
     assert experiments.public_definition()['available'] is True
+
+
+def test_expert_intercepts_and_bowl_stays_on_the_moving_platform():
+    cfg = experiments.load_config("so101-bowl-moving-platform")
+    sim = make_simulation(cfg)
+    assert not sim.is_placed()
+    result = rollout(sim, make_expert(10000, cfg), 10000)
+    targets = [step["observation"]["target"][1] for step in result["steps"]]
+    assert max(targets) - min(targets) > .02
+    assert result["success"] and result["collisions"] == 0
+    assert sim.model.neq == 0
+    assert sim.is_placed()
+    offset = sim.bowl[:2] - sim.target[:2]
+    sim._advance(.5)
+    assert sim.is_placed()
+    assert abs((sim.bowl[:2] - sim.target[:2] - offset)[1]) < .003

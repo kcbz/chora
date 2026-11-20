@@ -12,7 +12,7 @@ import yaml
 
 from .paths import WORKSPACE_ROOT as ROOT
 DEFAULT="so101-bowl"
-FIXED_SCENES=(DEFAULT,"so101-bowl-low-left","so101-bowl-high-right","ur10e-hammer","fr3-cut-apple","fr3-cut-tomato","fr3-cut-banana","fr3-tile-installation")
+FIXED_SCENES=(DEFAULT,"so101-bowl-raised-shelf","so101-bowl-moving-platform","ur10e-hammer","fr3-cut-apple","fr3-cut-tomato","fr3-cut-banana","fr3-tile-installation")
 PRESETS=ROOT/"configs/experiments"
 TASKS={
     "tile_adhesive_bedding":{"name":"Tile · Adhesive and bedding","object":"tile","instructions":"Arm B meters and combs each adhesive patch while arm A acquires and lifts its tile on the same physics timeline. Local clearance permits placement; the applicator parks after its final patch. A spatial reduced mortar layer supplies contact loads, redistributes ridge volume and tracks squeeze-out. This is an assumed simulation material law, not a resolved fluid or validated hardware model. Setting, grout/cleanup and fracture remain unimplemented."},
@@ -73,7 +73,7 @@ def validate_scene(scene):
             raise ValueError("Spawn bounds require two coordinates")
         for value in values:number(value,lo,hi,key)
         if values[0]>=values[1]:raise ValueError("Minimum spawn coordinate must be below maximum")
-    number(scene["table_height"],.03,.065,"Table height")
+    number(scene["table_height"],.03,.10,"Table height")
     if len(scene["target"])!=3 or len(scene["target_half_size"])!=2:
         raise ValueError("Invalid target dimensions")
     number(scene["target"][0],.13,.21,"Target x")
@@ -87,6 +87,22 @@ def validate_scene(scene):
     number(centre[1],.075,.135,"Table y")
     if any(abs(scene["target"][i]-centre[i])+scene["target_half_size"][i]>[.083,.074][i] for i in range(2)):
         raise ValueError("The target region must fit on the table")
+    if scene.get("table_style") not in (None, "shelf"):
+        raise ValueError("Unknown table style")
+    if "platform_motion" in scene:
+        motion = scene["platform_motion"]
+        if not isinstance(motion, dict) or set(motion) != {"travel", "peak_speed"}:
+            raise ValueError("Platform motion requires travel and peak speed limits")
+        number(motion["travel"], .01, .04, "Platform half-travel")
+        speeds = motion["peak_speed"]
+        if not isinstance(speeds, list) or len(speeds) != 2:
+            raise ValueError("Platform peak speed requires two values")
+        for speed in speeds:
+            number(speed, .005, .04, "Platform peak speed")
+        if speeds[0] > speeds[1]:
+            raise ValueError("Platform speed range is reversed")
+        if centre[1] - motion["travel"] - .074 <= scene["spawn_y"][1] + .029:
+            raise ValueError("Platform travel overlaps the pickup area")
 
 
 def load_config(experiment=DEFAULT):
@@ -139,7 +155,7 @@ def load_config(experiment=DEFAULT):
         cfg["experiment"]={k:value[k] for k in ("id","name","description","robot","task")}
         return cfg
     overrides=value.get("simulation",{})
-    allowed={"spawn_x","spawn_y","target","target_half_size","table_height","table_center"}
+    allowed={"spawn_x","spawn_y","target","target_half_size","table_height","table_center","table_style","platform_motion"}
     if set(overrides)-allowed:
         raise ValueError("Preset contains unsupported scene settings")
     cfg["simulation"].update(copy.deepcopy(overrides))
@@ -167,6 +183,8 @@ def public_definition(experiment=DEFAULT):
     task=TASKS[cfg["experiment"]["task"]]
     meta=definition(experiment)
     instructions=task['instructions']
+    if cfg["simulation"].get("platform_motion"):
+        instructions = "Pick up the bowl, intercept the moving platform, release it inside the green outline, and retreat. The bowl must remain upright and stable relative to the platform."
     if cfg['experiment']['robot']=='fr3':instructions='A native 7-axis FR3 carries the imported chef knife in a short installed adapter. Inspect real articulated motion, deformable food contact and the 55 N cutting-force stop. Food/skin parameters are uncalibrated; there is no juice solver or validated cutting score.'
     elif cfg['experiment']['robot']=='ur10e':instructions='A native 6-axis UR10e carries the scanned claw hammer. Align, accelerate in air, remove commanded downward task force before contact, and retract. Joint gravity/orientation control remains enabled. Guided-nail resistance is uncalibrated; this is not hardware impact qualification.'
     missing=[]
