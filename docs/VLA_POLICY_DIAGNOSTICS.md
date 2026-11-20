@@ -85,7 +85,8 @@ is used only by the environment scorer and reported outcomes.
 The runner is **synchronous**: simulation waits during inference. It is not the
 planned asynchronous delay-aware controller, a real-time guarantee or a physical
 robot safety system. The learned checkpoints remain experimental and unapproved
-for lab default-policy selection.
+for lab default-policy selection. They can be explicitly tested in the separate
+experimental Visual VLA panel, which reports their actual outcomes.
 
 Fixed diagnostic scenes: 20000 (a training scene) and 20003 (a separate development
 scene), with a 240-tick/9.6 simulated-second limit. No final test seeds were used.

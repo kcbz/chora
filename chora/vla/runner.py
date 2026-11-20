@@ -129,7 +129,7 @@ class ChunkPolicy:
         return action
 
 
-def run(checkpoint, dataset, *, output=None, device="mps", seeds=(20000, 20003), max_ticks=240, execute=4):
+def run(checkpoint, dataset, *, output=None, device="mps", seeds=(20000, 20003), max_ticks=240, execute=4, ui_progress=False):
     seeds = list(seeds)
     if not 1 <= len(seeds) <= 10 or any(not 20000 <= seed < 30000 for seed in seeds):
         raise ValueError("Diagnostics use 1..10 development seeds in 20000..29999")
@@ -148,6 +148,24 @@ def run(checkpoint, dataset, *, output=None, device="mps", seeds=(20000, 20003),
         verify_recording_contract(env, source, data.manifest["contract"]["fingerprint"])
         path.mkdir(parents=True, exist_ok=False)
         policy = ChunkPolicy(model, text, text_valid, saved, device=device, execute=execute)
+        last_publish = [0.]
+        def publish_ui(obs, phase, force=False):
+            if not ui_progress or (not force and time.monotonic()-last_publish[0] < .1):
+                return
+            from PIL import Image
+            image = Image.fromarray(np.concatenate([obs["images"][c] for c in env.camera_names], axis=1))
+            temporary = path/"latest.tmp.jpg"
+            image.save(temporary, format="JPEG", quality=88)
+            temporary.replace(path/"latest.jpg")
+            progress = dict(phase=phase, seed=env.sim.seed, tick=env.tick, max_ticks=max_ticks,
+                            simulation_seconds=env.tick*env.period, outcome=env.reason,
+                            success=env.success, inference_count=len(policy.inferences),
+                            inference_ms=policy.inferences[-1]["milliseconds"] if policy.inferences else None,
+                            frame_revision=time.time_ns())
+            temporary = path/"progress.tmp.json"
+            temporary.write_text(json.dumps(progress))
+            temporary.replace(path/"progress.json")
+            last_publish[0] = time.monotonic()
         results = []
         report = {"status": "running", "checkpoint": str(checkpoint), "dataset_fingerprint": data.manifest["fingerprint"],
                   "mode": "synchronous development diagnostics; physics waits for inference",
@@ -161,6 +179,7 @@ def run(checkpoint, dataset, *, output=None, device="mps", seeds=(20000, 20003),
             for seed in seeds:
                 obs = env.reset(seed)
                 policy.reset()
+                publish_ui(obs, "running", force=True)
                 guard = ActionGuard(env.bounds, env.sim.data.ctrl, env.period)
                 frames = [np.concatenate([obs["images"][c] for c in env.camera_names], axis=1)]
                 actions, applied, states, interventions = [], [], [obs["joint_positions"]], []
@@ -168,6 +187,9 @@ def run(checkpoint, dataset, *, output=None, device="mps", seeds=(20000, 20003),
                 stop = None
                 start = time.perf_counter()
                 while not env.done:
+                    if ui_progress and path.with_suffix(".stop").exists():
+                        env.done, env.reason = True, "stopped"
+                        break
                     try:
                         raw = policy.act(obs)
                         target, events = guard.apply(raw)
@@ -176,6 +198,7 @@ def run(checkpoint, dataset, *, output=None, device="mps", seeds=(20000, 20003),
                         stop = str(error)
                         env.done, env.success, env.reason = True, False, "policy_error"
                         break
+                    publish_ui(obs, "running")
                     actions.append(raw)
                     applied.append(target)
                     states.append(obs["joint_positions"])
@@ -191,6 +214,7 @@ def run(checkpoint, dataset, *, output=None, device="mps", seeds=(20000, 20003),
                                     raw_actions=np.asarray(actions), applied_actions=np.asarray(applied),
                                     joint_positions=np.asarray(states), timestamps=np.asarray(timestamps),
                                     final_qpos=env.sim.data.qpos.copy())
+                publish_ui(obs, "complete", force=True)
                 results.append(trial)
                 write()
                 print(f"Learned rollout {seed}: {trial['reason']}, {trial['ticks']} ticks, "
@@ -215,6 +239,7 @@ def main():
     parser.add_argument("--seeds", nargs="+", type=int, default=[20000, 20003])
     parser.add_argument("--max-ticks", type=int, default=240)
     parser.add_argument("--execute", type=int, default=4)
+    parser.add_argument("--ui-progress", action="store_true", help="Publish atomic camera/progress files for the local lab")
     print(run(**vars(parser.parse_args())))
 
 

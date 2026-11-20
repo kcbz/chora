@@ -3,7 +3,9 @@
 The current implementation supports development-pilot imitation training and a
 tiny-data fit check. A [bounded synchronous learned-policy runner](VLA_POLICY_DIAGNOSTICS.md)
 now supplies actual development task outcomes; those pilots still fail placement.
-Production training splits, a competent controller and lab UI controls remain.
+Production training splits and a competent controller remain. A separate
+experimental lab panel can now run existing checkpoints; training controls remain
+command-line tools.
 
 ## Prepare a dataset
 

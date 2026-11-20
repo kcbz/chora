@@ -1,0 +1,19 @@
+<section class="card vla-panel" id="vla-panel" aria-labelledby="vla-heading">
+  <div class="sectionhead"><h2 id="vla-heading">Visual VLA</h2><span class="tag">Experimental · standard bowl</span></div>
+  <p class="small">Test a camera-based policy using its scene and wrist views. The current pilot has not yet completed placement in its development tests.</p>
+  <div class="vla-layout">
+    <div class="vla-controls">
+      <label for="vla-checkpoint">Checkpoint</label><select id="vla-checkpoint"><option value="">Loading local checkpoints…</option></select>
+      <label for="vla-seed">Development scene seed</label><input id="vla-seed" type="number" min="20000" max="29999" step="1" value="20003">
+      <p class="small" id="vla-availability"></p>
+      <div class="buttons"><button class="primary" id="vla-run" type="button" onclick="startVla()" disabled>Test VLA</button><button class="secondary" id="vla-stop" type="button" onclick="stopVla()" disabled>Stop</button></div>
+      <p id="vla-status" class="result" role="status" aria-live="polite">Choose a checkpoint to test.</p>
+      <p id="vla-detail" class="small"></p><a id="vla-report" class="small" hidden>Open run results ↗</a>
+    </div>
+    <div class="vla-preview">
+      <div class="label">Scene camera · Wrist camera</div>
+      <div class="vla-camera"><p id="vla-empty" class="small">Live policy views appear when a test starts.</p><span id="vla-loading" class="viewer-activity" hidden><span class="spinner" aria-hidden="true"></span>Loading visual policy…</span><img id="vla-frame" alt="Live VLA scene and wrist camera views" hidden></div>
+      <p class="small">Synchronous simulation diagnostic · Up to 9.6 simulated seconds · Joint limits and collision stops active</p>
+    </div>
+  </div>
+</section>

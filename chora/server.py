@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 import os
 import mimetypes
 import queue
@@ -31,6 +32,8 @@ def scene_orbit(experiment):
 
 class Lab:
     def __init__(self):
+        from .vla.ui_service import VLAService
+        self.vla = VLAService(ROOT)
         self.experiment=os.environ.get("CHORA_EXPERIMENT",DEFAULT)
         self.commands = queue.Queue()
         self.stop = threading.Event()
@@ -50,15 +53,16 @@ class Lab:
         return output_dir(self.experiment)
 
     def select_experiment(self,experiment):
-        from .jobs import current_job
-        if experiment not in {x["id"] for x in catalog()}:raise ValueError("Choose a fixed scene from the selector")
-        load_config(experiment)
-        meta=public_definition(experiment)
-        if not meta['available']:raise ValueError(meta['unavailable_reason'])
-        if self.state["running"] or self.state.get("switching") or current_job(self.job,self.job_name,self.job_file,output=self.output).get("running"):
-            raise ValueError("Finish the running episode or pipeline stage before switching experiments")
-        self.state.update(switching=True,error=None)
-        self.commands.put({"operation":"experiment","experiment":experiment})
+        with self.lock:
+            from .jobs import current_job
+            if experiment not in {x["id"] for x in catalog()}:raise ValueError("Choose a fixed scene from the selector")
+            load_config(experiment)
+            meta=public_definition(experiment)
+            if not meta['available']:raise ValueError(meta['unavailable_reason'])
+            if self.vla.running or self.state["running"] or self.state.get("switching") or current_job(self.job,self.job_name,self.job_file,output=self.output).get("running"):
+                raise ValueError("Finish the running episode or pipeline stage before switching experiments")
+            self.state.update(switching=True,error=None)
+            self.commands.put({"operation":"experiment","experiment":experiment})
 
     def worker(self):
         from .sim import make_simulation
@@ -105,6 +109,7 @@ class Lab:
                     self.state.update(history=[],running=command["operation"]=="run",success=None,error=None,phase="preparing",achieved_speed=None)
                     publish(sim)
                     if command["operation"]=="run":
+                        if self.vla.running:raise ValueError("Finish the VLA test first")
                         self.state.update(running=True,phase="loading_policy")
                         name = command.get("policy","expert")
                         if name=="student":
@@ -166,8 +171,8 @@ class Lab:
                 raise ValueError("A pipeline job is already running")
             if self.job and self.job.poll() is None:
                 raise ValueError("A pipeline job is already running")
-            if self.state["running"]:
-                raise ValueError("Stop live playback before starting a pipeline job")
+            if self.state["running"] or self.vla.running:
+                raise ValueError("Stop live playback or the VLA test before starting a pipeline job")
             self.output.mkdir(parents=True,exist_ok=True)
             self.job_name = name
             path = self.output/f"{name}.log"
@@ -176,6 +181,18 @@ class Lab:
                 self.job = subprocess.Popen([sys.executable,"-u","-m","chora",*allowed[name]],cwd=ROOT,env={**os.environ,"CHORA_EXPERIMENT":self.experiment},stdout=log,stderr=subprocess.STDOUT)
                 self.job.chora_started_at = time.time()
             return str(self.job.pid)
+
+    def start_vla(self, checkpoint, seed):
+        from .jobs import current_job
+        with self.lock:
+            if self.experiment != DEFAULT:
+                raise ValueError("Select Bowl · Standard platform for these VLA checkpoints")
+            if self.state["running"] or self.state.get("switching") or current_job(self.job,self.job_name,self.job_file,output=self.output).get("running"):
+                raise ValueError("Finish the running episode or pipeline stage before testing the VLA")
+            return self.vla.start(checkpoint, seed)
+
+    def close(self):
+        self.vla.close()
 
     def status(self):
         with self.lock:
@@ -192,6 +209,8 @@ class Lab:
         state["results"] = read_json(self.output/"results.json",{})
         state["adapter_ready"] = (self.output/"adapter/adapters.safetensors").exists()
         state["model_ready"] = (ROOT/"assets/qwen/config.json").exists()
+        state["vla"] = self.vla.status()
+        state["vla"]["supported_scene"] = self.experiment == DEFAULT
         from .jobs import current_job, stage_history
         state["job"] = current_job(self.job,self.job_name,self.job_file,output=self.output)
         state["jobs"] = stage_history(output=self.output)
@@ -254,13 +273,16 @@ def serve(port=8765):
                 return self.respond(render_shell((WEB/"lab-template.html").read_text(),experiment=lab.experiment),"text/html; charset=utf-8")
             if path.startswith("/static/"):
                 name=path[len("/static/"):]
-                if name in {"app.css","appearance-core.js","appearance-ui.js","lab.js","logo-octahedron.svg"}:
+                if name in {"app.css","appearance-core.js","appearance-ui.js","lab.js","vla.js","logo-octahedron.svg"}:
                     file=WEB/name
                     return self.respond(file.read_bytes(),mimetypes.guess_type(file)[0] or "application/octet-stream")
             if path=="/api/experiments":
                 return self.respond({"experiments":catalog(),"active":lab.experiment})
             if path=="/api/status":
                 return self.respond(lab.status())
+            if path=="/api/vla/frame.jpg":
+                frame=lab.vla.frame()
+                return self.respond(frame,"image/jpeg",200 if frame else 503)
             if path=="/frame.jpg":
                 return self.respond(lab.image,"image/jpeg",200 if lab.image else 503)
             if path.startswith("/outputs/"):
@@ -286,6 +308,14 @@ def serve(port=8765):
                     raise ValueError("Invalid request length")
                 command = json.loads(self.rfile.read(length))
                 if not isinstance(command,dict):raise ValueError('Command must be a JSON object')
+                if self.path=="/api/vla":
+                    if command.get("operation") == "run" and set(command) == {"operation","checkpoint","seed"}:
+                        run_id = lab.start_vla(command["checkpoint"], command["seed"])
+                        return self.respond({"ok":True,"id":run_id})
+                    if command == {"operation":"stop"}:
+                        lab.vla.stop()
+                        return self.respond({"ok":True})
+                    raise ValueError("Invalid VLA command")
                 if self.path=="/api/control":
                     operation = command.get("operation")
                     if operation not in {"run","reset","stop","camera","orbit","speed"}:
@@ -296,42 +326,45 @@ def serve(port=8765):
                         raise ValueError("Unknown policy")
                     if not 0<=int(command.get("seed",0))<=999999:
                         raise ValueError("Seed must be 0..999999")
-                    if operation=="run":
-                        from .jobs import current_job
-                        if lab.state.get("switching") or current_job(lab.job,lab.job_name,lab.job_file,output=lab.output).get("running"):
-                            raise ValueError("Wait for the pipeline job before live playback")
-                        if lab.state["running"]:
-                            raise ValueError("An episode is already running")
-                        if command.get("policy")=="student" and not (lab.output/"adapter/adapters.safetensors").exists():
-                            raise ValueError("This experiment has no trained student yet. Use the expert or collect and train first.")
-                    if operation=="speed":
-                        lab.playback_speed=validate_speed(command.get("speed"))
-                    elif operation=="orbit":
-                        import math
-                        pose = command.get("orbit",{})
-                        az,el,dist = [float(pose[k]) for k in ("azimuth","elevation","distance")]
-                        lookat = [float(x) for x in pose["lookat"]]
-                        if len(lookat)!=3 or not all(math.isfinite(x) for x in [az,el,dist,*lookat]):
-                            raise ValueError("Camera pose must contain finite numbers")
-                        if not -89<=el<=-5 or not .2<=dist<=2 or any(abs(x)>2 for x in lookat):
-                            raise ValueError("Camera pose exceeds view limits")
-                        lab.orbit = {"azimuth":az%360,"elevation":el,"distance":dist,"lookat":lookat}
-                        lab.camera_name = "orbit"
-                        lab.state["camera"] = "orbit"
-                        if not lab.state["running"] and lab.commands.qsize()<2:
-                            lab.commands.put({"operation":"camera","camera":"orbit"})
-                    elif operation=="stop":
-                        lab.stop.set()
-                    elif operation=="camera" and lab.state["running"]:
-                        lab.camera_name = command["camera"]
-                        lab.state["camera"] = command["camera"]
-                    else:
-                        if operation!="camera": lab.stop.set()
-                        if lab.commands.qsize()>2:
-                            raise ValueError("Viewer is busy")
+                    with getattr(lab,"lock",nullcontext()):
+                        if operation in {"run","reset"} and getattr(getattr(lab,"vla",None),"running",False):
+                            raise ValueError("Stop the VLA test before running or resetting the main viewer")
                         if operation=="run":
-                            lab.state.update(running=True,phase="preparing",policy=command.get("policy","expert"))
-                        lab.commands.put(command)
+                            from .jobs import current_job
+                            if lab.state.get("switching") or current_job(lab.job,lab.job_name,lab.job_file,output=lab.output).get("running"):
+                                raise ValueError("Wait for the pipeline job before live playback")
+                            if lab.state["running"]:
+                                raise ValueError("An episode is already running")
+                            if command.get("policy")=="student" and not (lab.output/"adapter/adapters.safetensors").exists():
+                                raise ValueError("This experiment has no trained student yet. Use the expert or collect and train first.")
+                        if operation=="speed":
+                            lab.playback_speed=validate_speed(command.get("speed"))
+                        elif operation=="orbit":
+                            import math
+                            pose = command.get("orbit",{})
+                            az,el,dist = [float(pose[k]) for k in ("azimuth","elevation","distance")]
+                            lookat = [float(x) for x in pose["lookat"]]
+                            if len(lookat)!=3 or not all(math.isfinite(x) for x in [az,el,dist,*lookat]):
+                                raise ValueError("Camera pose must contain finite numbers")
+                            if not -89<=el<=-5 or not .2<=dist<=2 or any(abs(x)>2 for x in lookat):
+                                raise ValueError("Camera pose exceeds view limits")
+                            lab.orbit = {"azimuth":az%360,"elevation":el,"distance":dist,"lookat":lookat}
+                            lab.camera_name = "orbit"
+                            lab.state["camera"] = "orbit"
+                            if not lab.state["running"] and lab.commands.qsize()<2:
+                                lab.commands.put({"operation":"camera","camera":"orbit"})
+                        elif operation=="stop":
+                            lab.stop.set()
+                        elif operation=="camera" and lab.state["running"]:
+                            lab.camera_name = command["camera"]
+                            lab.state["camera"] = command["camera"]
+                        else:
+                            if operation!="camera": lab.stop.set()
+                            if lab.commands.qsize()>2:
+                                raise ValueError("Viewer is busy")
+                            if operation=="run":
+                                lab.state.update(running=True,phase="preparing",policy=command.get("policy","expert"))
+                            lab.commands.put(command)
                 elif self.path=="/api/job":
                     job_id = lab.launch(command.get("name"))
                     return self.respond({"ok":True,"job_id":job_id})
@@ -348,4 +381,6 @@ def serve(port=8765):
     print(f"Chora by Coherence: http://127.0.0.1:{server.server_port}",flush=True)
     try: server.serve_forever()
     except KeyboardInterrupt: pass
-    finally: server.server_close()
+    finally:
+        server.server_close()
+        if hasattr(lab,"close"):lab.close()

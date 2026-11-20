@@ -25,7 +25,8 @@ def render_shell(template, active="lab", experiment=None):
         "STYLES": '<link rel="stylesheet" href="/static/app.css">',
         "APPEARANCE_CORE": '<script src="/static/appearance-core.js"></script>',
         "APPEARANCE_UI": '<script src="/static/appearance-ui.js"></script>',
-        "LAB_SCRIPT": '<script src="/static/lab.js"></script>',
+        "LAB_SCRIPT": '<script src="/static/lab.js"></script><script src="/static/vla.js"></script>',
+        "VLA_PANEL": (WEB/"vla-panel.html").read_text(),
     }
     # Saved reports keep their content, but their chrome is refreshed from the
     # same components used by the live lab on each HTTP request.

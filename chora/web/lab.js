@@ -84,7 +84,7 @@ function buttonLabel(button,text,loading){
 function renderViewer(s){
  if(s.running)pendingRun=false;
  const running=Boolean(s.running||pendingRun||s.switching),preparing=s.switching||pendingRun||['preparing','loading_policy'].includes(s.phase);
- const pipeline=Boolean(uiJob(s).running);
+ const pipeline=Boolean(uiJob(s).running||s.vla?.running);
  buttonLabel($('run'),running?(preparing?'Preparing…':'Running…'):'Run episode',running);
  $('run').disabled=!s.ready||running||pipeline;$('reset').disabled=!s.ready||running||pipeline;$('stop').disabled=!s.running;
  const activity=$('viewer-activity');activity.hidden=!running&&Boolean(s.ready);
@@ -101,7 +101,7 @@ function savedSummary(name,s){
 }
 function renderPipeline(s){
  const material=s.experiment?.physics?.learning_enabled===false;document.querySelector(".pipeline").hidden=material;$("material-trial-note").hidden=!material;
- const current=uiJob(s),jobBusy=Boolean(current.running),busy=jobBusy||s.switching,history=s.jobs||{};
+ const current=uiJob(s),jobBusy=Boolean(current.running),busy=jobBusy||s.switching||s.vla?.running,history=s.jobs||{};
  const resultIds={check:'verifyText',generate:'collectText',curate:'curateText',train:'trainText',evaluate:'evalText'};
  for(const [name,id] of Object.entries(resultIds)){
   const meta=JOBS[name],card=document.querySelector(`[data-stage="${name}"]`),button=card.querySelector('button[data-job]');
@@ -163,7 +163,7 @@ function syncExperiment(s){
  $("robot-label").textContent=(s.experiment.robot_name||"SO-101")+" / MuJoCo";
  if(pendingExperiment===s.experiment.id)pendingExperiment=null;
  if(s.error&&!s.switching)pendingExperiment=null;
- const switching=Boolean(s.switching||pendingExperiment),pipeline=Boolean(uiJob(s).running);
+ const switching=Boolean(s.switching||pendingExperiment),pipeline=Boolean(uiJob(s).running||s.vla?.running);
  $('experiment-picker').value=pendingExperiment||s.experiment.id;
  fitScenePicker();
  $('experiment-picker').disabled=switching||pipeline||s.running;
@@ -188,8 +188,8 @@ loadExperimentCatalog().catch(error=>$('error').textContent=error.message);
 async function frame(){if(loadingFrame||!state.ready)return;loadingFrame=true;try{const r=await fetch('/frame.jpg?t='+Date.now());if(!r.ok)return;let blob=await r.blob(),url=URL.createObjectURL(blob),old=$('frame').src;$('frame').src=url;$('frame').style.visibility='visible';$('loading').style.display='none';if(old.startsWith('blob:'))URL.revokeObjectURL(old)}catch{}finally{loadingFrame=false}}
 function updateConnection(s){
  const indicator=document.querySelector('.connection-indicator');
- const job=uiJob(s),working=s.running||s.switching||job.running;
- let label=s.running?'Episode running':s.switching?'Loading experiment…':job.running?(JOBS[job.name]?.working||'Working')+' · on device':s.ready?'Lab online · on device':'Preparing simulation…';
+ const job=uiJob(s),working=s.running||s.switching||job.running||s.vla?.running;
+ let label=s.vla?.running?'VLA test running · on device':s.running?'Episode running':s.switching?'Loading experiment…':job.running?(JOBS[job.name]?.working||'Working')+' · on device':s.ready?'Lab online · on device':'Preparing simulation…';
  if(s.error&&!s.ready)label='Lab unavailable';
  if($('connection').textContent!==label)$('connection').textContent=label;
  indicator.dataset.state=s.error&&!s.ready?'offline':working||!s.ready?'busy':'online';
@@ -199,7 +199,7 @@ async function poll(){try{let r=await fetch('/api/status');if(!r.ok)throw Error(
 let trace=state.history||[];$('actions').replaceChildren();if(!trace.length){let li=document.createElement('li');li.textContent='Run an episode to see each decision.';$('actions').append(li)}trace.forEach((a,i)=>{let li=document.createElement('li'),n=document.createElement('span'),v=document.createElement('span');n.className='num';n.textContent=String(i+1).padStart(2,'0');v.textContent=actionLabel(a);li.append(n,v);$('actions').append(li)});$('actions').scrollTop=$('actions').scrollHeight;
 if(state.oracle){$('expertMetric').textContent=`${state.oracle.successes}/${state.oracle.episodes}`;$('expertCaption').textContent='Randomized scene check'}
 if(state.results?.student){const r=state.results.student;$('studentMetric').textContent=`${r.successes}/${r.episodes}`;$('studentCaption').textContent=r.complete_benchmark?'100 held-out scenes':'Partial evaluation'}
-renderPipeline(state);await frame()}catch(e){$('connection').textContent='Reconnecting to lab…';document.querySelector('.connection-indicator').dataset.state='offline';$('dot').classList.remove('pulse')}finally{setTimeout(poll,700)}}poll();setInterval(frame,110);
+renderPipeline(state);if(typeof renderVla==='function')renderVla(state);await frame()}catch(e){$('connection').textContent='Reconnecting to lab…';document.querySelector('.connection-indicator').dataset.state='offline';$('dot').classList.remove('pulse')}finally{setTimeout(poll,700)}}poll();setInterval(frame,110);
 
 function renderPhysics(s,o){
  const card=$('physics-card');card.hidden=!s.experiment?.physics;if(card.hidden)return;

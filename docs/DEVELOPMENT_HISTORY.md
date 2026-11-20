@@ -153,3 +153,17 @@ or validated real material behavior.
 - Updated M3 measurements and detailed limitations are recorded in
   [VLA_POLICY_DIAGNOSTICS.md](VLA_POLICY_DIAGNOSTICS.md). Broader demonstrations
   and checked recovery examples remain next; no competent VLA policy is claimed.
+
+## 2026-11-20 — Browser VLA tests and task-sized Git workflow
+
+- Moved completed work into task-sized commits and pushes, and documented the
+  ongoing development workflow. Corrected the isolated VLA dependency lock.
+- Sized scene selects to their chosen label and inset a shared chevron, verified
+  in dark/light appearance and at mobile width.
+- Added an experimental Visual VLA panel: discovered local checkpoints, development
+  seed selection, live scene/wrist frames, loading progress, Stop and run reports.
+  The lab launches the separate VLA environment and prevents conflicting jobs.
+- Verified an actual browser-driven cancellation and a complete 240-tick test;
+  the UI truthfully reported unsuccessful placement at the time limit. Existing
+  Qwen scores and control paths remain separate. Visual data/training commands
+  remain CLI-only, and no successful VLA placement is claimed.

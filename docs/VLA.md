@@ -4,7 +4,8 @@ Implemented: fixed-tick SO-101 expert recording/replay and a compact neural VLA
 skeleton with measured M3 inference, training-step and checkpoint smoke tests.
 A pilot chunk dataset and resumable imitation trainer are also implemented; see
 [VLA training](VLA_TRAINING.md). A competent closed-loop visual policy, production
-training/evaluation splits and lab UI integration remain to be implemented.
+training/evaluation splits remain to be implemented. The lab now includes an
+experimental VLA test panel; collection/training controls remain command-line tools.
 The [bounded synchronous runner](VLA_POLICY_DIAGNOSTICS.md) is implemented, but
 the current pilot has not completed bowl placement in its development rollouts.
 See the [integration plan](VLA_INTEGRATION_PLAN.md) for the remaining milestones.
@@ -147,3 +148,28 @@ datasets and resumable training. [Policy diagnostics](VLA_POLICY_DIAGNOSTICS.md)
 cover conditioning fixes and bounded development rollouts. More varied training
 and recovery examples are needed; a competent controller and delay-aware runner
 are not yet established.
+
+## Test from the browser
+
+Start the normal lab with `.venv/bin/python -m chora serve` and open
+[http://127.0.0.1:8765/](http://127.0.0.1:8765/). Select **Bowl · Standard platform**,
+then use the **Visual VLA** panel below the main simulation. Choose a discovered
+checkpoint, set a development seed in 20000..29999 and click **Test VLA**.
+The preferred default is the latest full-trajectory pilot, when available.
+
+The server launches one bounded synchronous episode in `.venv-vla`, showing live
+scene/wrist views and progress, inference timing and the actual outcome. **Stop**
+requests cancellation; **Open run results** links the saved report. Viewer orbit
+and playback-speed controls belong to the separate main simulation, not these
+fixed policy-camera views. Test results do not update the Qwen benchmark scores.
+
+Only completed local training checkpoints with matching datasets appear; arbitrary
+paths cannot be supplied through the browser. Missing dependencies/checkpoints or
+unsupported scenes disable testing with an explanation. Concurrent live episodes,
+scene switching and pipeline jobs are blocked during a VLA test. Source/runtime
+provenance and all existing action guards still apply. No expert fallback is used.
+
+UI runs live under `outputs/vla/ui-runs/`, with atomic camera/progress snapshots,
+the regular report/episode traces and a sibling process log. This is inference
+and inspection UI, not a visual-policy data collection/training interface.
+Restart an already-running lab after updating server code.

@@ -6,8 +6,9 @@ and [M3 measurements](VLA_M3_FEASIBILITY.md). The pilot dataset/trainer and boun
 fit checks are implemented; see [training](VLA_TRAINING.md). The bounded
 synchronous policy runner is implemented and its pilots still fail
 placement; see [diagnostics](VLA_POLICY_DIAGNOSTICS.md). A competent policy,
-production datasets, delay-aware runner, UI integration and two-arm VLA policies
-remain planned.
+production datasets, delay-aware runner and two-arm VLA policies remain planned.
+The lab now supports experimental checkpoint testing with live views and Stop;
+collection/training UI integration remains planned.
 
 ## Objective and boundaries
 
