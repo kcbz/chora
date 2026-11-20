@@ -1,14 +1,28 @@
 # Visual VLA development
 
-Implemented: fixed-tick SO-101 expert recording/replay and a compact neural VLA
-skeleton with measured M3 inference, training-step and checkpoint smoke tests.
-A pilot chunk dataset and resumable imitation trainer are also implemented; see
-[VLA training](VLA_TRAINING.md). A competent closed-loop visual policy, production
-training/evaluation splits remain to be implemented. The lab now includes an
-experimental VLA test panel; collection/training controls remain command-line tools.
-The [bounded synchronous runner](VLA_POLICY_DIAGNOSTICS.md) is implemented, but
-the current pilot has not completed bowl placement in its development rollouts.
-See the [integration plan](VLA_INTEGRATION_PLAN.md) for the remaining milestones.
+Chora has fixed-tick SO-101 expert recording, replay, and an experimental
+visual imitation trainer. Its trained pilot failed the closed-loop placement
+tests. The lab labels the visual policy as in development. See
+[VLA training](VLA_TRAINING.md) for the experimental pipeline and
+[the failure analysis](VLA_FAILURE_ANALYSIS.md) for the measured outcomes.
+
+## Verify the reference policy on a Mac
+
+The reported moving-pad results come from Dhruv's M2 policy in
+`distill_frontier` at tag `vla-v1`. Its model card lists the checksum for
+`vla-v1-m2.pt`, which must be obtained from the training machine.
+With the reference checkout next to Chora, run from the Chora root:
+
+```bash
+.venv-vla/bin/python scripts/verify_reference_vla.py --expert --episodes 3
+.venv-vla/bin/python scripts/verify_reference_vla.py --checkpoint /path/to/vla-v1-m2.pt
+```
+
+The first command exercises the reference physics, scripted expert and both
+cameras. The second verifies the checkpoint checksum and runs the original
+policy in its checkpoint-configured scene using Apple Metal. Increase
+`--episodes` to 100 to evaluate the reference held-out seeds. The script reports
+placement outcomes and replan latency after warmup and leaves the lab untouched.
 
 ## Record a development pilot
 
