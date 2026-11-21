@@ -20,6 +20,39 @@ function renderPlayback(s){
 }
 const $ = id => document.getElementById(id);
 const methodPicker = $('control-method');
+const inspectionPicker = $('inspection-case');
+let inspectionScene = null, inspectionCases = [], inspectionLoading = false;
+function inspectionCase(s) {
+ if (method !== 'vlm' || inspectionScene !== s.experiment?.id) return null;
+ return inspectionCases.find(row => row.id === inspectionPicker.value) || null;
+}
+function syncInspection(s) {
+ const scene = s.experiment?.id;
+ if (method !== 'vlm' || !s.vlm?.supported || !scene || scene === inspectionScene) return;
+ inspectionScene = scene;
+ inspectionCases = [];
+ inspectionPicker.replaceChildren();
+ inspectionLoading = true;
+ fetch('/api/inspection-cases').then(async response => {
+  if (!response.ok) throw Error('Could not load saved episode frames');
+  const data = await response.json();
+  if (inspectionScene !== data.scene) return;
+  inspectionCases = data.cases;
+  for (const row of inspectionCases) {
+   const option = document.createElement('option');
+   option.value = row.id;
+   option.textContent = (row.policy === 'student' ? 'Qwen' : 'Expert') + ' · ' + row.seed;
+   inspectionPicker.append(option);
+  }
+ }).catch(error => {if (inspectionScene === scene) $('error').textContent = error.message})
+  .finally(() => {
+   if (inspectionScene === scene) {
+    inspectionLoading = false;
+    renderWorkspace(state);
+   }
+  });
+}
+inspectionPicker.addEventListener('change', () => renderWorkspace(state));
 let state = {}, pendingJob = null, pendingRun = false, pendingVla = false, requestError = null;
 let method = methodPicker.value || 'expert';
 const seeds = {expert: '0', qwen: '0', vla: '20003'};
@@ -32,6 +65,11 @@ const visualRun = s => visualEpisode(s) && Boolean(pendingVla || s.vla?.running 
 async function post(url,data){$('error').textContent='';try{let r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});let d=await r.json();if(!r.ok)throw Error(d.error);return d}catch(e){$('error').textContent=e.message;throw e}}
 
 async function control(operation) {
+ if (method === 'vlm') {
+  const row = inspectionCase(state);
+  if (operation === 'run' && row) await job('vlm-inspect', {episode: row.id});
+  return;
+ }
  if (operation !== 'stop' && !$('seed').reportValidity()) return;
  if (method === 'vla') {
   try {
@@ -80,7 +118,7 @@ function scheduleOrbit(){
 const viewport=$('viewport');
 viewport.addEventListener('contextmenu',e=>e.preventDefault());
 viewport.addEventListener('pointerdown',e=>{
- if(!state.ready||visualRun(state)||!([0,2].includes(e.button)))return;
+ if(!state.ready||visualRun(state)||inspectionCase(state)||!([0,2].includes(e.button)))return;
  e.preventDefault();drag={x:e.clientX,y:e.clientY,button:e.button};
  viewport.setPointerCapture(e.pointerId);viewport.classList.add('dragging');
 });
@@ -97,9 +135,11 @@ viewport.addEventListener('pointermove',e=>{
 });
 function endDrag(){drag=null;viewport.classList.remove('dragging')}
 viewport.addEventListener('pointerup',endDrag);viewport.addEventListener('pointercancel',endDrag);
-viewport.addEventListener('wheel',e=>{if(!state.ready||visualRun(state))return;e.preventDefault();orbit.distance=Math.max(.22,Math.min(1.8,orbit.distance*Math.exp(e.deltaY*.0012)));scheduleOrbit()},{passive:false});
+viewport.addEventListener('wheel',e=>{if(!state.ready||visualRun(state)||inspectionCase(state))return;e.preventDefault();orbit.distance=Math.max(.22,Math.min(1.8,orbit.distance*Math.exp(e.deltaY*.0012)));scheduleOrbit()},{passive:false});
 
 const JOBS={
+ 'vlm-inspect':{title:'Image inspection',working:'Inspecting frame'},
+ 'vlm-benchmark':{title:'Visual inspection benchmark',working:'Scoring visual inspection'},
  'vla-train':{title:'Visual policy training',working:'Training visual policy'},
  'vla-test':{title:'Visual policy test',working:'Testing visual policy'},
  'vla-evaluate':{title:'Visual policy evaluation',working:'Evaluating visual policy'},
@@ -160,12 +200,19 @@ function renderViewer(s) {
  const v = s.vla || {};
  const isVisual = method === 'vla';
  const visual = visualRun(s);
+ const inspecting = method === 'vlm';
+ const row = inspectionCase(s);
+ const inspectionRunning = inspecting && uiJob(s).name === 'vlm-inspect' && uiJob(s).running;
  const running = Boolean(isVisual ? v.running || pendingVla : s.running || pendingRun);
  const preparing = Boolean(s.switching || (isVisual ? pendingVla || v.phase === 'loading' : pendingRun || ['preparing','loading_policy'].includes(s.phase)));
  const blocked = Boolean(uiJob(s).running || s.switching || pendingExperiment || (isVisual ? s.running : v.running));
- const canRun = isVisual ? Boolean(v.supported_scene && v.ready && v.recommended_id) :
+ const canRun = inspecting ? Boolean(s.vlm?.ready && row) : isVisual ? Boolean(v.supported_scene && v.ready && v.recommended_id) :
   method === 'expert' || (method === 'qwen' && !qwenStatus(s));
- const availability = method === 'vlm' ? 'Scene inspection is planned. A vision-language model has yet to be connected.' :
+ const inspectionStatus = !s.vlm?.supported ? 'Visual inspection supports the standard bowl and raised-shelf block.' :
+  !s.vlm.ready ? 'Set up the local vision model first.' : inspectionLoading ? 'Loading saved frames…' :
+  !row ? 'Evaluate an expert or student to save frames for inspection.' :
+  s.vlm.benchmark ? `Pilot accuracy: ${s.vlm.benchmark.correct}/${s.vlm.benchmark.examples} matched simulator geometry.` : '';
+ const availability = inspecting ? inspectionStatus :
   method === 'planner' ? 'Planned pilot: a Qwen planner calls checked robot skills and uses simulation feedback to recover.' :
   isVisual && !v.supported_scene ? 'VLA currently supports Bowl · Standard platform.' :
   isVisual && !canRun ? (v.unavailable_reason || 'A visual policy is not available for this scene.') :
@@ -173,19 +220,24 @@ function renderViewer(s) {
    (!s.results?.student ? 'Trained and ready to run. Evaluate student to publish scores and gallery previews.' : '')) : '';
  $('method-status').hidden = !availability;
  $('method-status').textContent = availability;
- $('seed-field').hidden = !usesSceneControls() && !canRun && !running;
+ $('inspection-fields').hidden = !inspecting || !s.vlm?.supported || !row;
+ inspectionPicker.disabled = Boolean(inspectionRunning || blocked);
+ $('inspection-question').textContent = 'Is the entire object inside the green target outline?';
+ $('seed-field').hidden = inspecting || (!usesSceneControls() && !canRun && !running);
  $('episode-buttons').hidden = !usesSceneControls() && !canRun && !running;
  $('seed').disabled = running || blocked;
  $('run').disabled = !s.ready || running || blocked || !canRun;
  $('reset').hidden = !usesSceneControls();
  $('reset').disabled = !s.ready || running || blocked;
+ $('stop').hidden = inspecting;
  $('stop').disabled = isVisual ? !v.running || v.phase === 'stopping' : !s.running;
- buttonLabel($('run'), running ? (isVisual && v.phase === 'stopping' ? 'Stopping…' : preparing ? 'Preparing…' : 'Running…') : 'Run episode', running);
+ if (inspecting) buttonLabel($('run'), inspectionRunning ? 'Inspecting…' : 'Inspect frame', inspectionRunning);
+ else buttonLabel($('run'), running ? (isVisual && v.phase === 'stopping' ? 'Stopping…' : preparing ? 'Preparing…' : 'Running…') : 'Run episode', running);
 
- $('camera-tabs').hidden = visual;
- $('orbit-hint').hidden = visual;
+ $('camera-tabs').hidden = visual || Boolean(row);
+ $('orbit-hint').hidden = visual || Boolean(row);
  const activity = $('viewer-activity');
- const activityLabel = !s.ready ? 'Preparing scene…' : s.switching ? 'Loading scene…' :
+ const activityLabel = inspectionRunning ? 'Inspecting frame…' : !s.ready ? 'Preparing scene…' : s.switching ? 'Loading scene…' :
   running ? (preparing ? 'Loading policy…' : isVisual ? 'VLA running' : method === 'qwen' ? 'Qwen running' : 'Expert running') : '';
  activity.hidden = !activityLabel;
  if (activityLabel && activity.dataset.label !== activityLabel) {
@@ -195,8 +247,8 @@ function renderViewer(s) {
   activity.replaceChildren(spinner, document.createTextNode(activityLabel));
   activity.dataset.label = activityLabel;
  }
- document.querySelector('.viewer').setAttribute('aria-busy', String(running || !s.ready || Boolean(s.switching)));
- $('mode').textContent = visual ? 'VLA · FRONT + WRIST' : usesSceneControls() && canRun ? 'PHYSICS SIMULATION' : 'SCENE PREVIEW';
+ document.querySelector('.viewer').setAttribute('aria-busy', String(inspectionRunning || running || !s.ready || Boolean(s.switching)));
+ $('mode').textContent = row ? 'VLM · OVERHEAD FRAME' : visual ? 'VLA · FRONT + WRIST' : usesSceneControls() && canRun ? 'PHYSICS SIMULATION' : 'SCENE PREVIEW';
 }
 function savedSummary(name,s){
  if(name==='check'&&s.oracle)return `Last completed check: ${s.oracle.successes}/${s.oracle.episodes} scenes successful.`;
@@ -259,10 +311,10 @@ function renderPipeline(s){
  const log=(current.log||'').trim();$('job-details').hidden=!log;$('jobLog').textContent=log;
  if($('job-details').open)$('jobLog').scrollTop=$('jobLog').scrollHeight;
 }
-async function job(name){
+async function job(name, args={}){
  if(pendingJob||uiJob(state).running)return;
  requestError=null;pendingJob={name,id:null};renderWorkspace(state);
- try{const result=await post('/api/job',{name});pendingJob.id=result.job_id}
+ try{const result=await post('/api/job',{name,...args});pendingJob.id=result.job_id}
  catch(error){pendingJob=null;requestError={name,status:'failed',running:false,error:error.message};renderWorkspace(state)}
 }
 let experimentCatalog=[],pendingExperiment=null;
@@ -342,6 +394,7 @@ async function selectExperiment(id) {
 }
 
 function selectMethod(value, refresh = true) {
+ if (value === 'vlm' && value !== method) inspectionScene = null;
  if (value !== method && method in seeds) seeds[method] = $('seed').value;
  method = value;
  methodPicker.value = value;
@@ -359,6 +412,8 @@ loadExperimentCatalog().catch(error => $('error').textContent = error.message);
 
 let loadingFrame = false, frameRevision = null;
 function frameSource(s) {
+ const row = inspectionCase(s);
+ if (row) return {key:'inspection:' + inspectionScene + ':' + row.id, inspection: row.image};
  if (visualRun(s)) return {key: 'vla:' + (pendingVla ? 'pending' : s.vla?.id), visual: true};
  return {key: 'scene:' + (pendingExperiment || s.experiment?.id), visual: false};
 }
@@ -366,12 +421,12 @@ function syncFrame(s) {
  const source = frameSource(s);
  if (viewport.dataset.frameKey !== source.key) {
   viewport.dataset.frameKey = source.key;
-  viewport.dataset.source = source.visual ? 'vla' : 'scene';
+  viewport.dataset.source = source.inspection ? 'inspection' : source.visual ? 'vla' : 'scene';
   const image = $('frame');
   if (image.src.startsWith('blob:')) URL.revokeObjectURL(image.src);
   image.removeAttribute('src');
   image.style.visibility = 'hidden';
-  image.alt = source.visual ? 'Live VLA front and wrist cameras' : 'Live robot simulation';
+  image.alt = source.inspection ? 'Saved final frame for visual inspection' : source.visual ? 'Live VLA front and wrist cameras' : 'Live robot simulation';
   $('loading').style.display = '';
   $('loading').lastChild.textContent = source.visual ? ' Loading visual policy…' : ' Preparing the simulation…';
   frameRevision = null;
@@ -380,10 +435,11 @@ function syncFrame(s) {
 async function frame() {
  const source = frameSource(state), v = state.vla;
  if (loadingFrame || !state.ready || pendingExperiment || state.switching ||
+ (source.inspection && $('frame').style.visibility === 'visible') ||
  (source.visual && (pendingVla || !v?.has_frame || (!v.running && frameRevision === v.frame_revision)))) return;
  loadingFrame = true;
  try {
-  const path = source.visual ? '/api/vla/frame.jpg' : '/frame.jpg';
+  const path = source.inspection || (source.visual ? '/api/vla/frame.jpg' : '/frame.jpg');
   const response = await fetch(path + '?t=' + Date.now());
   if (!response.ok) return;
   const blob = await response.blob();
@@ -407,15 +463,16 @@ function updateConnection(s){
  indicator.title=label;$('dot').classList.toggle('pulse',Boolean(working));
 }
 function renderMeasurements(s) {
- const expert = s.oracle, student = s.results?.student;
+ const expertTest = s.results?.expert, expert = expertTest || s.oracle, student = s.results?.student;
  const visual = method === 'vla' && s.vla?.ready && s.vla?.supported_scene ?
   s.vla.candidates?.[0]?.evaluation : null;
  const skillTrial = s.experiment?.physics?.learning_enabled === false;
  $('metrics-card').hidden = !(visual || (usesSceneControls() && !skillTrial));
  $('expert-metric').hidden = method === 'vla';
  $('student-metric').hidden = method === 'expert';
+ $('expert-metric-label').textContent = expertTest ? 'EXPERT TEST' : 'EXPERT CHECK';
  $('expertMetric').textContent = expert ? `${expert.successes}/${expert.episodes}` : '—';
- $('expertCaption').textContent = expert ? 'Randomized scene check' : 'Expert check pending';
+ $('expertCaption').textContent = expertTest ? 'Held-out scenes' : expert ? 'Randomized scene check' : 'Expert check pending';
  $('student-metric-label').textContent = visual ? 'VISUAL POLICY' : 'STUDENT TEST';
  $('studentMetric').textContent = visual ? `${visual.unseen_successes}/${visual.unseen_episodes}` :
   student ? `${student.successes}/${student.episodes}` : '—';
@@ -428,17 +485,23 @@ function renderEpisode(s) {
  const o = s.observation || {}, v = s.vla || {};
  const visual = visualRun(s);
  const match = usesSceneControls() && s.policy === currentPolicy();
+ const inspection = inspectionCase(s);
  const hammer = ['hammer_nail','hammer_pine','impact_nail'].includes(o.task);
  const suffix = hammer && usesSceneControls() ? ` · NAIL ${Math.round(o.nail_depth*1000)} / ${Math.round(o.target_depth*1000)} mm` :
   o.target_velocity ? ` · PLATFORM ${Math.round(Math.abs(o.target_velocity[1])*1000)} mm/s` : '';
  $('trace-card').hidden = !usesSceneControls();
  $('run-report').hidden = !(visualEpisode(s) && v.report_url && !pendingVla);
  if (!$('run-report').hidden) $('run-report').href = v.report_url;
- $('scene').textContent = visual ? (pendingVla || !v.has_frame ? 'Preparing policy cameras' :
+ $('scene').textContent = inspection ? `FINAL FRAME · SEED ${inspection.seed}` : visual ? (pendingVla || !v.has_frame ? 'Preparing policy cameras' :
   `SEED ${v.seed} · TICK ${v.tick || 0} / ${v.max_ticks || 240}`) :
   s.ready ? `SEED ${s.seed} · ${match ? 'DECISION ' + (o.step || 0) + ' · ' : ''}${s.camera?.toUpperCase() || 'FRONT'}${suffix}` : 'Waiting for scene';
  let message = '';
- if (visualEpisode(s)) {
+ if (inspection) {
+  const active = uiJob(s), result = s.vlm?.latest;
+  message = active.name === 'vlm-inspect' && active.running ? 'Inspecting the image…' :
+   active.name === 'vlm-inspect' && active.status === 'failed' ? (active.error || 'Inspection failed.') :
+   result?.id === inspection.id ? `Model: ${result.answer} · Simulator: ${result.expected} · ${(result.latency_ms/1000).toFixed(1)} s` : '';
+ } else if (visualEpisode(s)) {
   message = pendingVla || v.phase === 'loading' ? 'Loading visual policy…' : v.phase === 'stopping' ? 'Stopping…' :
    v.running ? ('Executing joint targets' + (typeof v.inference_ms === 'number' ? ` · ${v.inference_ms.toFixed(0)} ms last inference` : '')) : v.phase === 'failed' ? (v.error || 'The rollout failed.') :
    v.phase === 'stopped' ? 'Episode stopped.' : v.success ? 'Placement completed.' :
@@ -472,6 +535,7 @@ function renderEpisode(s) {
 
 function renderWorkspace(s) {
  syncExperiment(s);
+ syncInspection(s);
  renderViewer(s);
  renderTrainingShortcut(s);
  renderPlayback(s);

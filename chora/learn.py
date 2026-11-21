@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import ExitStack
 import tempfile
 import time
 from pathlib import Path
@@ -366,6 +367,7 @@ def evaluate(n=None,policy_name="student",record=3):
     from .policy import make_expert
     from .sim import make_simulation
     from .gallery import save_thumbnail
+    from .visual_inspection import SUPPORTED, inspection_camera, save_inspection_frame
     from .visualization import Camera, Recorder
     cfg = config(); n = n or cfg["evaluation"]["episodes"]
     if not 1<=n<=100:
@@ -380,8 +382,13 @@ def evaluate(n=None,policy_name="student",record=3):
         stage = Path(directory)
         trial_dir = stage / "evaluation" / policy_name
         trial_dir.mkdir(parents=True)
-        camera = Camera(sim,640,480)
-        try:
+        with ExitStack() as stack:
+            camera = Camera(sim,640,480)
+            stack.callback(camera.close)
+            overhead = None
+            if cfg["experiment"]["id"] in SUPPORTED:
+                overhead = inspection_camera(sim)
+                stack.callback(overhead.close)
             for i in range(n):
                 seed = cfg["evaluation"]["seed_start"]+i
                 sim.reset(seed)
@@ -392,11 +399,11 @@ def evaluate(n=None,policy_name="student",record=3):
                     if recorder: recorder.close()
                 e["video"] = f"evaluation/{policy_name}/seed_{seed}.mp4" if recorder else None
                 save_thumbnail(camera,sim,e,policy_name,stage)
+                if overhead:
+                    save_inspection_frame(overhead,sim,e,policy_name,stage)
                 results.append(e)
                 job_progress(i+1,n,f"Evaluated {i+1} of {n} scenes · {sum(x['success'] for x in results)} successful")
                 print(f"{policy_name}: {i+1}/{n}; successes {sum(x['success'] for x in results)}",flush=True)
-        finally:
-            camera.close()
         save_json(trial_dir/"episodes.json",results)
         previous = stage / "previous"
         if out.exists():

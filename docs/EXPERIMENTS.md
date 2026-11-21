@@ -163,7 +163,9 @@ Each scene has separate demonstrations, adapters, and evaluation results. In the
 lab, select **Qwen · State-based imitation** and choose **Go to training**. Pass
 the expert check, collect and curate demonstrations, then train the student.
 After training, **Run episode** becomes available. **Evaluate student** measures
-generalization on reserved scenes.
+generalization on reserved scenes. The routine 50-episode expert check gates
+data collection. A separate 100-episode held-out expert evaluation matches the
+student benchmark and populates the expert side of Gallery.
 
 ## UI architecture
 

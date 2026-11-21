@@ -111,6 +111,16 @@ def policy_results(experiment, policy, active, vla_status=None):
         else:
             detail = (f'{evidence["unseen_successes"]}/{evidence["unseen_episodes"]} '
                       "unseen development scenes completed.")
+    elif policy == "vlm":
+        if active == "gallery":
+            detail = "Visual inspection uses the saved frames from scored episodes. Choose a frame in the lab."
+        else:
+            benchmark = read_json(directory / "vlm/benchmark.json", {})
+            if benchmark.get("view") == "overhead":
+                detail = (f'{benchmark["correct"]}/{benchmark["examples"]} image answers matched simulator geometry. '
+                          "The question measures horizontal fit inside the target outline.")
+            else:
+                detail = "No visual inspection benchmark has been saved for this scene yet."
     else:
         detail = "This method is planned. Results will appear once it can run in the lab."
     title = "Evaluation gallery" if active == "gallery" else "Experiment report"

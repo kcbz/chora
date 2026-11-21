@@ -160,12 +160,24 @@ class Lab:
         finally:
             if camera: camera.close()
 
-    def launch(self,name):
+    def launch(self,name,episode=None):
         from .jobs import current_job
         physics=load_config(self.experiment).get('physics',{})
         if physics.get('learning_enabled') is False:raise ValueError(physics.get('learning_readiness','This material trial has no supported scoring/student action protocol yet. Use Run episode to inspect it.'))
         allowed = {"check":["expert"],"generate":["generate"],"curate":["curate"],
                    "train":["train"],"evaluate":["evaluate","--record","3"]}
+        python = sys.executable
+        module = "chora"
+        if name == "vlm-inspect":
+            from .visual_inspection import public_cases, status as inspection_status
+
+            if not inspection_status(self.experiment, self.output)["ready"]:
+                raise ValueError("Local vision inspection is unavailable for this scene")
+            if episode not in {row["id"] for row in public_cases(self.experiment, self.output)}:
+                raise ValueError("Choose a saved episode with a verified frame")
+            python = str(ROOT / ".venv-vlm/bin/python")
+            module = "chora.visual_inspection"
+            allowed[name] = ["inspect", "--episode", episode]
         if name=="train" and (self.output/"adapter/adapters.safetensors").exists():
             allowed["train"].append("--replace")
         if name not in allowed:
@@ -182,7 +194,7 @@ class Lab:
             path = self.output/f"{name}.log"
             self.job_file = path
             with path.open("w") as log:
-                self.job = subprocess.Popen([sys.executable,"-u","-m","chora",*allowed[name]],cwd=ROOT,env={**os.environ,"CHORA_EXPERIMENT":self.experiment},stdout=log,stderr=subprocess.STDOUT)
+                self.job = subprocess.Popen([python,"-u","-m",module,*allowed[name]],cwd=ROOT,env={**os.environ,"CHORA_EXPERIMENT":self.experiment},stdout=log,stderr=subprocess.STDOUT)
                 self.job.chora_started_at = time.time()
             return str(self.job.pid)
 
@@ -215,6 +227,8 @@ class Lab:
         state["model_ready"] = (ROOT/"assets/qwen/config.json").exists()
         state["vla"] = self.vla.status()
         state["vla"]["supported_scene"] = self.experiment == DEFAULT
+        from .visual_inspection import status as inspection_status
+        state["vlm"] = inspection_status(self.experiment, self.output)
         from .jobs import current_job, stage_history
         state["job"] = current_job(self.job,self.job_name,self.job_file,output=self.output)
         state["jobs"] = stage_history(output=self.output)
@@ -292,6 +306,10 @@ def serve(port=8765):
                     return self.respond(file.read_bytes(),mimetypes.guess_type(file)[0] or "application/octet-stream")
             if path=="/api/experiments":
                 return self.respond({"experiments":catalog(),"active":lab.experiment})
+            if path == "/api/inspection-cases":
+                from .visual_inspection import public_cases
+                scene = lab.experiment
+                return self.respond({"scene": scene, "cases": public_cases(scene, output_dir(scene))})
             if path=="/api/status":
                 return self.respond(lab.status())
             if path=="/api/vla/frame.jpg":
@@ -380,7 +398,8 @@ def serve(port=8765):
                                 lab.state.update(running=True,phase="preparing",policy=command.get("policy","expert"))
                             lab.commands.put(command)
                 elif self.path=="/api/job":
-                    job_id = lab.launch(command.get("name"))
+                    job_id = (lab.launch(command["name"], command.get("episode")) if command.get("name") == "vlm-inspect"
+                              else lab.launch(command.get("name")))
                     return self.respond({"ok":True,"job_id":job_id})
                 elif self.path=="/api/experiments":
                     return self.respond({"error":"Scene copies are disabled. Choose a fixed scene."},status=405)

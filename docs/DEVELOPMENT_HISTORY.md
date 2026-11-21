@@ -233,3 +233,14 @@ or validated real material behavior.
   Evaluations now save a final-state preview for every scored episode.
 - Renamed the planned hierarchical mode Skill Orchestrator and recorded the
   first tiling pilot architecture.
+
+
+## 2026-11-20 — Visual inspection and comparable expert benchmarks
+
+- Added local VLM inspection of verified overhead frames. The pilot matched
+  geometry on 11/12 bowl and 9/12 block examples.
+- Ran the same 100 held-out expert seeds for the block and moving bowl. Each
+  completed all 100. The Standard expert benchmark remains 97/100.
+- Added a direct-action VLA pilot. It placed the bowl on one familiar seed
+  and collided on the second. Faster replanning timed out on both seeds. The
+  checkpoint did not qualify for use from the lab.

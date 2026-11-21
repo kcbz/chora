@@ -1,10 +1,11 @@
 """Compact, evidence-backed episode wall and verified final-state thumbnails."""
 import json
+from contextlib import ExitStack
 from html import escape
 from pathlib import Path
 from urllib.parse import quote
 
-from .common import OUTPUT, exclusive_job, job_progress, read_json, save_json
+from .common import OUTPUT, config, exclusive_job, job_progress, read_json, save_json
 from .experiments import output_url
 from .ui import page
 
@@ -39,17 +40,25 @@ def thumbnails(policy="all"):
     total=sum(len(rows) for _,rows in groups)
     if not total:
         raise ValueError("No scored episodes are available. Evaluate a policy first.")
-    sim=make_simulation(); camera=Camera(sim,640,480); completed=0
-    try:
+    from .visual_inspection import SUPPORTED, inspection_camera, save_inspection_frame
+    sim = make_simulation()
+    completed = 0
+    with ExitStack() as stack:
+        camera = Camera(sim,640,480)
+        stack.callback(camera.close)
+        overhead = None
+        if config()["experiment"]["id"] in SUPPORTED:
+            overhead = inspection_camera(sim)
+            stack.callback(overhead.close)
         for name,episodes in groups:
             for e in episodes:
                 verify_trace(sim,e)
                 save_thumbnail(camera, sim, e, name, OUTPUT)
+                if overhead:
+                    save_inspection_frame(overhead, sim, e, name, OUTPUT)
                 completed+=1
-                job_progress(completed,total,f"Preparing verified episode thumbnails · {completed}/{total}")
+                job_progress(completed,total,f"Preparing verified episode frames · {completed}/{total}")
             save_json(OUTPUT/"evaluation"/name/"episodes.json",episodes)
-    finally:
-        camera.close()
     from .report import build_report
     build_report()
     job_progress(total,total,f"Prepared {completed} verified episode thumbnails")
