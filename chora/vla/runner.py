@@ -17,7 +17,7 @@ import uuid
 import numpy as np
 import torch
 
-from ..common import OUTPUT, exclusive_job, job_progress
+from ..common import OUTPUT, exclusive_job, job_progress, save_json
 from .dataset import ChunkDataset, digest
 from .actions import decode_actions
 from .env import BowlTickEnv
@@ -123,7 +123,8 @@ class ChunkPolicy:
                 raise ValueError("Nonfinite or malformed learned action chunk")
             sync(self.device)
             self.inferences.append({"tick": tick, "observation_timestamp": obs["timestamp"],
-                                    "milliseconds": (time.perf_counter()-start)*1000})
+                                    "milliseconds": (time.perf_counter()-start)*1000,
+                                    "first_target_rad": raw[0].tolist()})
             self.queue.extend((tick+i, action.copy()) for i, action in enumerate(raw[:self.execute]))
             while len(self.features) > self.history_offset+1:
                 self.features.popitem(last=False)
@@ -166,6 +167,7 @@ def run(checkpoint, dataset, *, output=None, device="mps", seeds=(20000, 20003),
                             simulation_seconds=env.tick*env.period, outcome=env.reason,
                             success=env.success, inference_count=len(policy.inferences),
                             inference_ms=policy.inferences[-1]["milliseconds"] if policy.inferences else None,
+                            trace=policy.inferences[-12:],
                             frame_revision=time.time_ns())
             temporary = path/"progress.tmp.json"
             temporary.write_text(json.dumps(progress))
@@ -179,7 +181,7 @@ def run(checkpoint, dataset, *, output=None, device="mps", seeds=(20000, 20003),
                   "no_expert_fallback": True, "seeds": seeds, "trials": results,
                   "note": "No claim of delay-aware control, physical safety, benchmark success or runtime approval."}
         def write():
-            (path/"report.json").write_text(json.dumps(report, indent=2)+"\n")
+            save_json(path / "report.json", report)
         write()
         try:
             for seed in seeds:

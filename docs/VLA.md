@@ -189,25 +189,21 @@ To reproduce from the existing three-episode pilot dataset:
 ## Visual policy in the browser
 
 In the lab select **Bowl · Standard platform**, then **VLA · Camera-based
-control**. With an evaluated model, the main viewer shows its front and wrist
-cameras and Experiment controls handles the seed, run, stop, and outcome.
-Without one, the same viewer remains available as a scene preview. Gallery
-and Reports are scoped to this method.
+control**. The learning pipeline checks the fixed-rate expert, records
+front and wrist cameras with joint actions, prepares episode-level training
+and validation sets, trains a camera-based policy, and evaluates its closed-loop
+rollouts. Evaluation shows familiar and held-out placement scores and collision
+counts. Gallery shows the final camera frames and recorded action replans.
 
-A model must satisfy the basic development check: at least ten distinct scenes
-outside the dataset's train/validation episodes, at least 80% placement success,
-no collisions, matching weight hashes and the deployed execution horizon. This
-is a simulation development criterion, not physical validation. The current
-replacement scored 0/10, so no model is exposed for UI execution. Browser requests
-cannot launch an unqualified checkpoint, even if its ID is supplied directly.
+Evaluation first requires two successful familiar rollouts without collisions.
+A model qualifies for live runs after passing at least 80% of ten distinct scenes
+outside its training and validation data with no collisions. The verdict is tied
+to the weights and execution horizon used for the test. The current candidate
+placed the bowl in one of two familiar rollouts and collided in the other. The
+pipeline exposes those results and keeps Run episode disabled until a model
+qualifies. See [failure analysis](VLA_FAILURE_ANALYSIS.md).
 
-Training runs and failed diagnostics remain in local outputs and developer CLI
-commands. Their names (such as overfit, joint conditioning and action order)
-describe internal experiments, not robot tasks, scenes or usable model choices.
-See [failure analysis](VLA_FAILURE_ANALYSIS.md) for the actual results. The expert
-and Qwen baseline remain in the main controls.
-
-When a qualifying model exists, run the normal lab with
-`.venv/bin/python -m chora serve`, select the standard bowl scene, and use its
-single visual-policy run control. Live scene/wrist frames, Stop and outcome
-reporting remain supported. Restart the server after updating backend code.
+Once a model qualifies, use **Experiment controls** to set the seed, run,
+stop, or reset the episode. The lab viewer shows live front and wrist cameras.
+**Replan trace** displays recent inference times and the first joint targets
+from each predicted action chunk.

@@ -47,6 +47,7 @@ class Lab:
         self.job = None
         self.job_name = None
         self.job_file = None
+        self.job_experiment = None
         self.playback_speed = 1
         self.camera_name = "front"
         self.orbit = scene_orbit(self.experiment)
@@ -56,6 +57,14 @@ class Lab:
     def output(self):
         return output_dir(self.experiment)
 
+    def active_job(self):
+        from .jobs import current_job
+
+        scene = getattr(self, "job_experiment", None)
+        if self.job and scene and (scene == self.experiment or self.job.poll() is None):
+            return current_job(self.job, self.job_name, self.job_file, output=output_dir(scene))
+        return current_job(output=self.output)
+
     def select_experiment(self,experiment):
         with self.lock:
             from .jobs import current_job
@@ -63,7 +72,7 @@ class Lab:
             load_config(experiment)
             meta=public_definition(experiment)
             if not meta['available']:raise ValueError(meta['unavailable_reason'])
-            if self.vla.running or self.state["running"] or self.state.get("switching") or current_job(self.job,self.job_name,self.job_file,output=self.output).get("running"):
+            if self.vla.running or self.state["running"] or self.state.get("switching") or self.active_job().get("running"):
                 raise ValueError("Finish the running episode or pipeline stage before switching experiments")
             self.state.update(switching=True,error=None)
             self.commands.put({"operation":"experiment","experiment":experiment})
@@ -160,52 +169,83 @@ class Lab:
         finally:
             if camera: camera.close()
 
-    def launch(self,name,episode=None):
-        from .jobs import current_job
-        physics=load_config(self.experiment).get('physics',{})
-        if physics.get('learning_enabled') is False:raise ValueError(physics.get('learning_readiness','This material trial has no supported scoring/student action protocol yet. Use Run episode to inspect it.'))
+    def launch(self,name,episode=None,*,experiment=None):
+        from .visual_inspection import STAGES as INSPECTION_STAGES, public_cases, status as inspection_status
+        from .vla.workflow import STAGES as ACTION_STAGES
+
+        scene = self.experiment if experiment is None else experiment
+        if experiment is not None and name != "vlm-inspect":
+            raise ValueError("Only gallery inspection can target a different scene")
+        output = output_dir(scene)
+        physics = load_config(scene).get("physics", {})
+        if physics.get("learning_enabled") is False:
+            raise ValueError(physics.get("learning_readiness","This trial has no learning pipeline."))
         allowed = {"check":["expert"],"generate":["generate"],"curate":["curate"],
                    "train":["train"],"evaluate":["evaluate","--record","3"]}
-        python = sys.executable
-        module = "chora"
-        if name == "vlm-inspect":
-            from .visual_inspection import public_cases, status as inspection_status
-
-            if not inspection_status(self.experiment, self.output)["ready"]:
-                raise ValueError("Local vision inspection is unavailable for this scene")
-            if episode not in {row["id"] for row in public_cases(self.experiment, self.output)}:
-                raise ValueError("Choose a saved episode with a verified frame")
-            python = str(ROOT / ".venv-vlm/bin/python")
+        python, module = sys.executable, "chora"
+        if name in ACTION_STAGES:
+            if scene != DEFAULT:
+                raise ValueError("Select Bowl · Standard platform for the VLA pipeline")
+            python = str(ROOT / ".venv-vla/bin/python")
+            module, allowed[name] = "chora.vla.workflow", [name]
+        elif name == "vlm-inspect" or name in INSPECTION_STAGES:
+            status = inspection_status(scene, output)
+            if not status["supported"]:
+                raise ValueError("Visual inspection supports the standard bowl and raised-shelf block")
             module = "chora.visual_inspection"
-            allowed[name] = ["inspect", "--episode", episode]
-        if name=="train" and (self.output/"adapter/adapters.safetensors").exists():
+            if name == "vlm-frames":
+                if not status["can_prepare"]:
+                    raise ValueError("Evaluate an expert or student before preparing frames")
+            elif not status["ready"]:
+                raise ValueError("Set up the local vision model first")
+            else:
+                python = str(ROOT / ".venv-vlm/bin/python")
+            if name == "vlm-inspect":
+                if not isinstance(episode, str) or episode not in {row["id"] for row in public_cases(scene, output)}:
+                    raise ValueError("Choose a saved episode with a verified frame")
+                allowed[name] = ["inspect", "--episode", episode]
+            else:
+                allowed[name] = INSPECTION_STAGES[name]
+        if name == "train" and (output / "adapter/adapters.safetensors").exists():
             allowed["train"].append("--replace")
         if name not in allowed:
             raise ValueError("Unknown job")
+        if not Path(python).is_file():
+            raise ValueError("Set up the isolated model environment first")
         with self.lock:
-            if self.state.get("switching") or current_job(self.job,self.job_name,self.job_file,output=self.output).get("running"):
+            from .jobs import current_job
+            if self.state.get("switching") or self.active_job().get("running") or current_job(output=output).get("running"):
                 raise ValueError("A pipeline job is already running")
             if self.job and self.job.poll() is None:
                 raise ValueError("A pipeline job is already running")
             if self.state["running"] or self.vla.running:
                 raise ValueError("Stop live playback or the VLA test before starting a pipeline job")
-            self.output.mkdir(parents=True,exist_ok=True)
+            output.mkdir(parents=True,exist_ok=True)
             self.job_name = name
-            path = self.output/f"{name}.log"
+            self.job_experiment = scene
+            path = output/f"{name}.log"
             self.job_file = path
             with path.open("w") as log:
-                self.job = subprocess.Popen([python,"-u","-m",module,*allowed[name]],cwd=ROOT,env={**os.environ,"CHORA_EXPERIMENT":self.experiment},stdout=log,stderr=subprocess.STDOUT)
+                self.job = subprocess.Popen([python,"-u","-m",module,*allowed[name]],cwd=ROOT,env={**os.environ,"CHORA_EXPERIMENT":scene},stdout=log,stderr=subprocess.STDOUT)
                 self.job.chora_started_at = time.time()
             return str(self.job.pid)
 
     def start_vla(self, checkpoint, seed):
-        from .jobs import current_job
         with self.lock:
             if self.experiment != DEFAULT:
                 raise ValueError("Select Bowl · Standard platform for these VLA checkpoints")
-            if self.state["running"] or self.state.get("switching") or current_job(self.job,self.job_name,self.job_file,output=self.output).get("running"):
+            if self.state["running"] or self.state.get("switching") or self.active_job().get("running"):
                 raise ValueError("Finish the running episode or pipeline stage before testing the VLA")
             return self.vla.start(checkpoint, seed)
+
+    def reset_vla(self, seed):
+        if type(seed) is not int or not 20000 <= seed < 30000:
+            raise ValueError("VLA seeds must be 20000–29999")
+        with self.lock:
+            if self.experiment != DEFAULT or self.state.get("running") or self.state.get("switching") or self.active_job().get("running"):
+                raise ValueError("Wait for the standard bowl lab to be idle")
+            self.vla.reset()
+            self.commands.put({"operation":"reset", "seed":seed})
 
     def close(self):
         self.vla.close()
@@ -229,8 +269,10 @@ class Lab:
         state["vla"]["supported_scene"] = self.experiment == DEFAULT
         from .visual_inspection import status as inspection_status
         state["vlm"] = inspection_status(self.experiment, self.output)
-        from .jobs import current_job, stage_history
-        state["job"] = current_job(self.job,self.job_name,self.job_file,output=self.output)
+        from .jobs import stage_history
+        from .vla.workflow import status as action_status
+        state["vla"]["workflow"] = action_status(self.output) if self.experiment == DEFAULT else {}
+        state["job"] = self.active_job()
         state["jobs"] = stage_history(output=self.output)
         return state
 
@@ -301,15 +343,25 @@ def serve(port=8765):
                 return self.respond(html, "text/html; charset=utf-8")
             if path.startswith("/static/"):
                 name=path[len("/static/"):]
-                if name in {"app.css","appearance-core.js","appearance-ui.js","lab.js","logo-octahedron.svg"}:
+                if name in {"app.css","appearance-core.js","appearance-ui.js","lab.js","visual-gallery.js","logo-octahedron.svg"}:
                     file=WEB/name
                     return self.respond(file.read_bytes(),mimetypes.guess_type(file)[0] or "application/octet-stream")
             if path=="/api/experiments":
                 return self.respond({"experiments":catalog(),"active":lab.experiment})
-            if path == "/api/inspection-cases":
-                from .visual_inspection import public_cases
-                scene = lab.experiment
-                return self.respond({"scene": scene, "cases": public_cases(scene, output_dir(scene))})
+            if path == "/api/vlm/inspection":
+                from .jobs import current_job
+                from .visual_inspection import SUPPORTED, answer_for
+                args = parse_qs(query)
+                scene = args.get("experiment", [""])[0]
+                if scene not in SUPPORTED:
+                    return self.respond({"error": "Unknown inspection scene"}, status=400)
+                output = output_dir(scene)
+                episode = args.get("episode", [""])[0]
+                job = current_job(output=output)
+                running = job.get("name") == "vlm-inspect" and job.get("running")
+                return self.respond({"answer":answer_for(scene, output, episode),
+                                     "running": bool(running), "job_id":job.get("id"),
+                                     "error":job.get("error") if job.get("name") == "vlm-inspect" else None})
             if path=="/api/status":
                 return self.respond(lab.status())
             if path=="/api/vla/frame.jpg":
@@ -344,6 +396,9 @@ def serve(port=8765):
                     if command.get("operation") == "run" and set(command) == {"operation","checkpoint","seed"}:
                         run_id = lab.start_vla(command["checkpoint"], command["seed"])
                         return self.respond({"ok":True,"id":run_id})
+                    if command.get("operation") == "reset" and set(command) == {"operation","seed"}:
+                        lab.reset_vla(command["seed"])
+                        return self.respond({"ok":True})
                     if command == {"operation":"stop"}:
                         lab.vla.stop()
                         return self.respond({"ok":True})
@@ -362,8 +417,7 @@ def serve(port=8765):
                         if operation in {"run","reset"} and getattr(getattr(lab,"vla",None),"running",False):
                             raise ValueError("Stop the VLA test before running or resetting the main viewer")
                         if operation=="run":
-                            from .jobs import current_job
-                            if lab.state.get("switching") or current_job(lab.job,lab.job_name,lab.job_file,output=lab.output).get("running"):
+                            if lab.state.get("switching") or lab.active_job().get("running"):
                                 raise ValueError("Wait for the pipeline job before live playback")
                             if lab.state["running"]:
                                 raise ValueError("An episode is already running")
@@ -397,9 +451,16 @@ def serve(port=8765):
                             if operation=="run":
                                 lab.state.update(running=True,phase="preparing",policy=command.get("policy","expert"))
                             lab.commands.put(command)
+                elif self.path == "/api/vlm/inspect":
+                    from .visual_inspection import SUPPORTED
+                    if set(command) != {"experiment", "episode"} or not isinstance(command["experiment"], str) or command["experiment"] not in SUPPORTED:
+                        raise ValueError("Choose an inspection scene and saved episode")
+                    job_id = lab.launch("vlm-inspect", command["episode"], experiment=command["experiment"])
+                    return self.respond({"ok":True,"job_id":job_id})
                 elif self.path=="/api/job":
-                    job_id = (lab.launch(command["name"], command.get("episode")) if command.get("name") == "vlm-inspect"
-                              else lab.launch(command.get("name")))
+                    if set(command) != {"name"} or not isinstance(command["name"], str) or command["name"] == "vlm-inspect":
+                        raise ValueError("Choose a pipeline stage")
+                    job_id = lab.launch(command["name"])
                     return self.respond({"ok":True,"job_id":job_id})
                 elif self.path=="/api/experiments":
                     return self.respond({"error":"Scene copies are disabled. Choose a fixed scene."},status=405)

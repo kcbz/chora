@@ -2,6 +2,7 @@
 
 from argparse import ArgumentParser
 from collections import Counter
+import hashlib
 import math
 import re
 import time
@@ -13,6 +14,7 @@ from .gallery import media_url
 MODEL = "mlx-community/Qwen3-VL-2B-Instruct-4bit"
 REVISION = "9c4f5209e57b31f4b9dfba735de3fb983739c9cc"
 SUPPORTED = {"so101-bowl", "so101-part-raised-shelf"}
+STAGES = {"vlm-model": ["check"], "vlm-frames": ["prepare"], "vlm-benchmark": ["benchmark", "--per-class", "6"]}
 
 
 def model_directory():
@@ -30,9 +32,19 @@ def ready():
 def status(scene, output):
     supported = scene in SUPPORTED
     benchmark = read_json(output / "vlm/benchmark.json", {}) if supported else {}
-    score = {key: benchmark[key] for key in ("correct", "examples")} if benchmark.get("view") == "overhead" else None
+    score = None
+    if benchmark.get("view") == "overhead":
+        evidence = benchmark.get("trials", [])
+        score = {key: benchmark[key] for key in ("correct", "examples")}
+        score["uncertain"] = sum(row.get("answer") == "uncertain" for row in evidence)
+        score["latency_ms"] = round(sum(row["latency_ms"] for row in evidence) / len(evidence)) if evidence else None
+    frame_count = sum(1 for _ in output.glob("evaluation/*/inspection/seed_*.jpg")) if supported else 0
+    scores = read_json(output / "results.json", {}) if supported else {}
     return dict(supported=supported, ready=supported and ready(), benchmark=score,
-                latest=read_json(output / "vlm/latest.json") if supported else None)
+                frames=frame_count, can_prepare=any((output / "evaluation" / policy / "episodes.json").is_file()
+                                                    for policy in ("expert", "student")) if supported else False,
+                can_benchmark=bool(scores.get("student")) and frame_count > 0)
+
 
 
 def cases(scene, output):
@@ -123,12 +135,14 @@ class Inspector:
 
 def inspect_case(inspector, row, output):
     observation = row["observation"]
-    question, text, latency = inspector.ask(output / row["thumbnail"], "bowl" if "bowl" in observation else "block")
+    image_file = output / row["thumbnail"]
+    fingerprint = hashlib.sha256(image_file.read_bytes()).hexdigest()
+    question, text, latency = inspector.ask(image_file, "bowl" if "bowl" in observation else "block")
     answer = parse_answer(text)
     expected = "yes" if footprint_inside(observation) else "no"
     return {k: row[k] for k in ("id", "seed", "policy", "image")} | dict(
         question=question, answer=answer, expected=expected, correct=answer==expected,
-        latency_ms=latency, raw_answer=text, model=MODEL, revision=REVISION,
+        latency_ms=latency, raw_answer=text, model=MODEL, revision=REVISION, frame_sha256=fingerprint,
     )
 
 
@@ -138,10 +152,10 @@ def inspect(episode):
     row = next((row for row in cases(scene, OUTPUT) if row["id"] == episode), None)
     if row is None:
         raise ValueError("Choose a saved episode with a verified frame.")
-    job_progress(0,1,"Loading the local vision model…")
+    job_progress(0,1,"Loading the local vision model…", episode=episode)
     result = inspect_case(Inspector(), row, OUTPUT)
-    save_json(OUTPUT / "vlm/latest.json", result)
-    job_progress(1,1,"Image inspection complete")
+    save_json(OUTPUT / f"vlm/answers/{episode}.json", result)
+    job_progress(1,1,"Image inspection complete", episode=episode)
     return result
 
 
@@ -170,10 +184,62 @@ def benchmark(per_class):
     return {key: value for key, value in report.items() if key != "trials"}
 
 
+@exclusive_job("vlm-model")
+def check_model():
+    job_progress(0,1,"Checking the downloaded local model…")
+    Inspector()
+    job_progress(1,1,"Local inspection model loaded successfully")
+
+
+@exclusive_job("vlm-frames")
+def prepare_frames():
+    from .gallery import thumbnails
+
+    return thumbnails.__wrapped__()
+
+
+def saved_answers(output, rows):
+    benchmark_path = output / "vlm/benchmark.json"
+    benchmark = read_json(benchmark_path, {})
+    scored = {row["id"]: row for row in benchmark.get("trials", [])} if benchmark.get("view") == "overhead" else {}
+    latest_path = output / "vlm/latest.json"
+    latest = read_json(latest_path, {})
+    answers = {}
+    for row in rows:
+        manual_path = output / f"vlm/answers/{row['id']}.json"
+        image_file = output / row["thumbnail"]
+        candidates = [(read_json(manual_path, {}), manual_path), (latest, latest_path),
+                      (scored.get(row["id"], {}), benchmark_path)]
+        for answer, source in candidates:
+            if answer.get("id") != row["id"] or answer.get("image") != row["image"]:
+                continue
+            try:
+                fingerprint = answer.get("frame_sha256")
+                if fingerprint:
+                    if hashlib.sha256(image_file.read_bytes()).hexdigest() != fingerprint:
+                        continue
+                elif image_file.stat().st_mtime_ns > source.stat().st_mtime_ns:
+                    continue
+            except FileNotFoundError:
+                continue
+            answers[row["id"]] = answer
+            break
+    return answers
+
+
+def answer_for(scene, output, episode):
+    if scene not in SUPPORTED or not isinstance(episode, str) or not re.fullmatch(r"(student|expert)-[0-9]{1,9}", episode):
+        return None
+    matching = (row for row in cases(scene, output) if row["id"] == episode)
+    return saved_answers(output, matching).get(episode)
+
+
 def main():
     parser = ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("download")
+    commands.add_parser("check")
+    commands.add_parser("prepare")
     job = commands.add_parser("inspect")
     job.add_argument("--episode", required=True)
     check = commands.add_parser("benchmark")
@@ -185,6 +251,10 @@ def main():
         print(snapshot_download(MODEL, revision=REVISION,
                                 cache_dir=ROOT / ".cache/huggingface/hub",
                                 allow_patterns=["*.json", "*.safetensors", "*.txt", "*.jinja", "*.model"]))
+    elif args.command == "check":
+        check_model()
+    elif args.command == "prepare":
+        prepare_frames()
     elif args.command == "inspect":
         print(inspect(args.episode))
     else:

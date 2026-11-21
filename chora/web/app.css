@@ -73,9 +73,9 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 #pipeline-title{scroll-margin-top:20px}
 #control-method{padding-right:36px}
 #viewport[data-source="vla"]{aspect-ratio:2/1;cursor:default;touch-action:auto}
-#viewport[data-source="inspection"]{cursor:default;touch-action:auto}
-#inspection-case{max-width:100%}
 .viewer{align-self:start}
 #method-status,#pipeline-note{line-height:1.65}
 #run-report{display:inline-block;margin-top:6px}
 [hidden]{display:none!important}
+
+.evaluation-links{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;margin-top:12px}

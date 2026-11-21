@@ -88,6 +88,10 @@ def policy_results(experiment, policy, active, vla_status=None):
 
     directory = output_dir(experiment)
     label = CONTROL_METHODS[policy][0]
+    if active == "gallery" and policy in {"vla", "vlm"}:
+        from .visual_gallery import render
+
+        return render(experiment, policy)
     if policy in {"expert", "qwen"}:
         if active == "gallery":
             from .gallery import render_gallery
@@ -99,28 +103,25 @@ def policy_results(experiment, policy, active, vla_status=None):
             return render_shell(saved.read_text(), active, experiment, policy)
         detail = "Run the scene's evaluations to see its report here."
     elif policy == "vla":
-        visual = vla_status or {}
-        chosen = next(iter(visual.get("candidates", [])), None)
-        evidence = chosen.get("evaluation", {}) if chosen else {}
+        from .vla.workflow import status
+
+        workflow = status(directory) if experiment == DEFAULT else {}
+        score = workflow.get("unseen") or workflow.get("familiar")
         if experiment != DEFAULT:
             detail = "Visual policy evaluation currently supports the standard bowl scene."
-        elif not evidence:
-            detail = "Results will appear here after a visual policy passes development evaluation."
-        elif active == "gallery":
-            detail = "No video recordings have been published for the evaluated visual policy."
+        elif score:
+            split = "held-out" if workflow.get("unseen") else "familiar"
+            collisions = score["collisions"]
+            detail = f'{score["successes"]}/{score["episodes"]} {split} placements. {collisions} collision{"s" if collisions != 1 else ""}. View the saved trials in Gallery.'
         else:
-            detail = (f'{evidence["unseen_successes"]}/{evidence["unseen_episodes"]} '
-                      "unseen development scenes completed.")
+            detail = "Train and evaluate a camera policy to see the rollout scores."
     elif policy == "vlm":
-        if active == "gallery":
-            detail = "Visual inspection uses the saved frames from scored episodes. Choose a frame in the lab."
+        benchmark = read_json(directory / "vlm/benchmark.json", {})
+        if benchmark.get("view") == "overhead":
+            detail = (f'{benchmark["correct"]}/{benchmark["examples"]} image answers matched simulator geometry. '
+                      "The question measures horizontal fit inside the target outline. Open Gallery to inspect the frames.")
         else:
-            benchmark = read_json(directory / "vlm/benchmark.json", {})
-            if benchmark.get("view") == "overhead":
-                detail = (f'{benchmark["correct"]}/{benchmark["examples"]} image answers matched simulator geometry. '
-                          "The question measures horizontal fit inside the target outline.")
-            else:
-                detail = "No visual inspection benchmark has been saved for this scene yet."
+            detail = "No visual inspection benchmark has been saved for this scene yet."
     else:
         detail = "This method is planned. Results will appear once it can run in the lab."
     title = "Evaluation gallery" if active == "gallery" else "Experiment report"

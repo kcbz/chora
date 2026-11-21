@@ -50,5 +50,4 @@ def current_job(process=None,name=None,log_path=None,output=None):
 
 def stage_history(output=None):
     output=output or OUTPUT
-    return {name:normalize(read_json(output/"jobs"/f"{name}.json",{}))
-            for name in ("check","generate","curate","train","evaluate")}
+    return {path.stem:normalize(read_json(path,{})) for path in (output/"jobs").glob("*.json")}

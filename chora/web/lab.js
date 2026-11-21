@@ -20,39 +20,6 @@ function renderPlayback(s){
 }
 const $ = id => document.getElementById(id);
 const methodPicker = $('control-method');
-const inspectionPicker = $('inspection-case');
-let inspectionScene = null, inspectionCases = [], inspectionLoading = false;
-function inspectionCase(s) {
- if (method !== 'vlm' || inspectionScene !== s.experiment?.id) return null;
- return inspectionCases.find(row => row.id === inspectionPicker.value) || null;
-}
-function syncInspection(s) {
- const scene = s.experiment?.id;
- if (method !== 'vlm' || !s.vlm?.supported || !scene || scene === inspectionScene) return;
- inspectionScene = scene;
- inspectionCases = [];
- inspectionPicker.replaceChildren();
- inspectionLoading = true;
- fetch('/api/inspection-cases').then(async response => {
-  if (!response.ok) throw Error('Could not load saved episode frames');
-  const data = await response.json();
-  if (inspectionScene !== data.scene) return;
-  inspectionCases = data.cases;
-  for (const row of inspectionCases) {
-   const option = document.createElement('option');
-   option.value = row.id;
-   option.textContent = (row.policy === 'student' ? 'Qwen' : 'Expert') + ' · ' + row.seed;
-   inspectionPicker.append(option);
-  }
- }).catch(error => {if (inspectionScene === scene) $('error').textContent = error.message})
-  .finally(() => {
-   if (inspectionScene === scene) {
-    inspectionLoading = false;
-    renderWorkspace(state);
-   }
-  });
-}
-inspectionPicker.addEventListener('change', () => renderWorkspace(state));
 let state = {}, pendingJob = null, pendingRun = false, pendingVla = false, requestError = null;
 let method = methodPicker.value || 'expert';
 const seeds = {expert: '0', qwen: '0', vla: '20003'};
@@ -65,15 +32,13 @@ const visualRun = s => visualEpisode(s) && Boolean(pendingVla || s.vla?.running 
 async function post(url,data){$('error').textContent='';try{let r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});let d=await r.json();if(!r.ok)throw Error(d.error);return d}catch(e){$('error').textContent=e.message;throw e}}
 
 async function control(operation) {
- if (method === 'vlm') {
-  const row = inspectionCase(state);
-  if (operation === 'run' && row) await job('vlm-inspect', {episode: row.id});
-  return;
- }
  if (operation !== 'stop' && !$('seed').reportValidity()) return;
  if (method === 'vla') {
   try {
-   if (operation === 'stop') {
+   if (operation === 'reset') {
+    await post('/api/vla', {operation, seed: Number($('seed').value)});
+    state.vla = {...state.vla, id:null, phase:'idle', has_frame:false, report_url:null, trace:[]};
+   } else if (operation === 'stop') {
     await post('/api/vla', {operation});
     state.vla = {...state.vla, phase: 'stopping'};
    } else if (operation === 'run' && state.vla?.supported_scene && state.vla.ready) {
@@ -118,7 +83,7 @@ function scheduleOrbit(){
 const viewport=$('viewport');
 viewport.addEventListener('contextmenu',e=>e.preventDefault());
 viewport.addEventListener('pointerdown',e=>{
- if(!state.ready||visualRun(state)||inspectionCase(state)||!([0,2].includes(e.button)))return;
+ if(!state.ready||visualRun(state)||!([0,2].includes(e.button)))return;
  e.preventDefault();drag={x:e.clientX,y:e.clientY,button:e.button};
  viewport.setPointerCapture(e.pointerId);viewport.classList.add('dragging');
 });
@@ -135,11 +100,16 @@ viewport.addEventListener('pointermove',e=>{
 });
 function endDrag(){drag=null;viewport.classList.remove('dragging')}
 viewport.addEventListener('pointerup',endDrag);viewport.addEventListener('pointercancel',endDrag);
-viewport.addEventListener('wheel',e=>{if(!state.ready||visualRun(state)||inspectionCase(state))return;e.preventDefault();orbit.distance=Math.max(.22,Math.min(1.8,orbit.distance*Math.exp(e.deltaY*.0012)));scheduleOrbit()},{passive:false});
+viewport.addEventListener('wheel',e=>{if(!state.ready||visualRun(state))return;e.preventDefault();orbit.distance=Math.max(.22,Math.min(1.8,orbit.distance*Math.exp(e.deltaY*.0012)));scheduleOrbit()},{passive:false});
 
 const JOBS={
  'vlm-inspect':{title:'Image inspection',working:'Inspecting frame'},
  'vlm-benchmark':{title:'Visual inspection benchmark',working:'Scoring visual inspection'},
+ 'vlm-model':{title:'Local model check',working:'Checking the vision model'},
+ 'vlm-frames':{title:'Inspection frame preparation',working:'Preparing inspection frames'},
+ 'vla-check':{title:'Fixed-tick expert check',working:'Checking the visual expert'},
+ 'vla-record':{title:'Visual demonstration recording',working:'Recording camera demonstrations'},
+ 'vla-prepare':{title:'Visual dataset preparation',working:'Preparing visual data'},
  'vla-train':{title:'Visual policy training',working:'Training visual policy'},
  'vla-test':{title:'Visual policy test',working:'Testing visual policy'},
  'vla-evaluate':{title:'Visual policy evaluation',working:'Evaluating visual policy'},
@@ -174,9 +144,10 @@ function qwenStatus(s) {
 }
 function renderTrainingShortcut(s) {
  const visualTraining = method === 'vla' && s.vla?.supported_scene;
+ const inspectionPipeline = method === 'vlm' && s.vlm?.supported;
  const qwenTraining = usesSceneControls() && supportsQwenTraining(s);
  const shortcut = $('training-shortcut');
- shortcut.hidden = !visualTraining && !qwenTraining;
+ shortcut.hidden = !visualTraining && !qwenTraining && !inspectionPipeline;
  const active = uiJob(s);
  const label = active.running ? (JOBS[active.name]?.working || 'Working') : s.vla?.running ?
   'Running visual policy' : s.switching || pendingExperiment ? 'Loading scene' : s.running ? 'Running episode' : '';
@@ -187,7 +158,7 @@ function renderTrainingShortcut(s) {
  $('training-activity').hidden = !label;
  if ($('training-activity-label').textContent !== label + counts) $('training-activity-label').textContent = label + counts;
  shortcut.disabled = Boolean((method === 'expert' && methodPicker.disabled) || s.switching || pendingExperiment);
- shortcut.textContent = visualTraining ? 'Training details ↓' : 'Go to training ↓';
+ shortcut.textContent = inspectionPipeline ? 'Go to inspection pipeline ↓' : 'Go to training ↓';
 }
 $('training-shortcut').addEventListener('click', () => {
  if (method === 'expert') selectMethod('qwen');
@@ -200,44 +171,32 @@ function renderViewer(s) {
  const v = s.vla || {};
  const isVisual = method === 'vla';
  const visual = visualRun(s);
- const inspecting = method === 'vlm';
- const row = inspectionCase(s);
- const inspectionRunning = inspecting && uiJob(s).name === 'vlm-inspect' && uiJob(s).running;
  const running = Boolean(isVisual ? v.running || pendingVla : s.running || pendingRun);
  const preparing = Boolean(s.switching || (isVisual ? pendingVla || v.phase === 'loading' : pendingRun || ['preparing','loading_policy'].includes(s.phase)));
  const blocked = Boolean(uiJob(s).running || s.switching || pendingExperiment || (isVisual ? s.running : v.running));
- const canRun = inspecting ? Boolean(s.vlm?.ready && row) : isVisual ? Boolean(v.supported_scene && v.ready && v.recommended_id) :
+ const canRun = isVisual ? Boolean(v.supported_scene && v.ready && v.recommended_id) :
   method === 'expert' || (method === 'qwen' && !qwenStatus(s));
- const inspectionStatus = !s.vlm?.supported ? 'Visual inspection supports the standard bowl and raised-shelf block.' :
-  !s.vlm.ready ? 'Set up the local vision model first.' : inspectionLoading ? 'Loading saved frames…' :
-  !row ? 'Evaluate an expert or student to save frames for inspection.' :
-  s.vlm.benchmark ? `Pilot accuracy: ${s.vlm.benchmark.correct}/${s.vlm.benchmark.examples} matched simulator geometry.` : '';
- const availability = inspecting ? inspectionStatus :
-  method === 'planner' ? 'Planned pilot: a Qwen planner calls checked robot skills and uses simulation feedback to recover.' :
+ const availability =  method === 'planner' ? 'Planned pilot: a Qwen planner calls checked robot skills and uses simulation feedback to recover.' :
   isVisual && !v.supported_scene ? 'VLA currently supports Bowl · Standard platform.' :
   isVisual && !canRun ? (v.unavailable_reason || 'A visual policy is not available for this scene.') :
   method === 'qwen' ? (qwenStatus(s) ||
    (!s.results?.student ? 'Trained and ready to run. Evaluate student to publish scores and gallery previews.' : '')) : '';
  $('method-status').hidden = !availability;
  $('method-status').textContent = availability;
- $('inspection-fields').hidden = !inspecting || !s.vlm?.supported || !row;
- inspectionPicker.disabled = Boolean(inspectionRunning || blocked);
- $('inspection-question').textContent = 'Is the entire object inside the green target outline?';
- $('seed-field').hidden = inspecting || (!usesSceneControls() && !canRun && !running);
- $('episode-buttons').hidden = !usesSceneControls() && !canRun && !running;
+ $('experiment-controls').hidden = method === 'vlm';
+ $('seed-field').hidden = !usesSceneControls() && !isVisual;
+ $('episode-buttons').hidden = !usesSceneControls() && !isVisual;
  $('seed').disabled = running || blocked;
  $('run').disabled = !s.ready || running || blocked || !canRun;
- $('reset').hidden = !usesSceneControls();
- $('reset').disabled = !s.ready || running || blocked;
- $('stop').hidden = inspecting;
+ $('reset').hidden = !usesSceneControls() && !isVisual;
+ $('reset').disabled = !s.ready || running || blocked || (isVisual && !canRun);
  $('stop').disabled = isVisual ? !v.running || v.phase === 'stopping' : !s.running;
- if (inspecting) buttonLabel($('run'), inspectionRunning ? 'Inspecting…' : 'Inspect frame', inspectionRunning);
- else buttonLabel($('run'), running ? (isVisual && v.phase === 'stopping' ? 'Stopping…' : preparing ? 'Preparing…' : 'Running…') : 'Run episode', running);
+ buttonLabel($('run'), running ? (isVisual && v.phase === 'stopping' ? 'Stopping…' : preparing ? 'Preparing…' : 'Running…') : 'Run episode', running);
 
- $('camera-tabs').hidden = visual || Boolean(row);
- $('orbit-hint').hidden = visual || Boolean(row);
+ $('camera-tabs').hidden = visual;
+ $('orbit-hint').hidden = visual;
  const activity = $('viewer-activity');
- const activityLabel = inspectionRunning ? 'Inspecting frame…' : !s.ready ? 'Preparing scene…' : s.switching ? 'Loading scene…' :
+ const activityLabel = !s.ready ? 'Preparing scene…' : s.switching ? 'Loading scene…' :
   running ? (preparing ? 'Loading policy…' : isVisual ? 'VLA running' : method === 'qwen' ? 'Qwen running' : 'Expert running') : '';
  activity.hidden = !activityLabel;
  if (activityLabel && activity.dataset.label !== activityLabel) {
@@ -247,8 +206,8 @@ function renderViewer(s) {
   activity.replaceChildren(spinner, document.createTextNode(activityLabel));
   activity.dataset.label = activityLabel;
  }
- document.querySelector('.viewer').setAttribute('aria-busy', String(inspectionRunning || running || !s.ready || Boolean(s.switching)));
- $('mode').textContent = row ? 'VLM · OVERHEAD FRAME' : visual ? 'VLA · FRONT + WRIST' : usesSceneControls() && canRun ? 'PHYSICS SIMULATION' : 'SCENE PREVIEW';
+ document.querySelector('.viewer').setAttribute('aria-busy', String(running || !s.ready || Boolean(s.switching)));
+ $('mode').textContent = visual ? 'VLA · FRONT + WRIST' : usesSceneControls() && canRun ? 'PHYSICS SIMULATION' : 'SCENE PREVIEW';
 }
 function savedSummary(name,s){
  if(name==='check'&&s.oracle)return `Last completed check: ${s.oracle.successes}/${s.oracle.episodes} scenes successful.`;
@@ -258,43 +217,92 @@ function savedSummary(name,s){
  if(name==='evaluate'&&s.results?.student){const r=s.results.student;return `Last completed evaluation: ${r.successes}/${r.episodes} scenes successful.`}
  return '';
 }
+const pipelineCards = [...document.querySelectorAll('[data-stage]')].map(card => ({
+ card, key:card.dataset.stage, heading:card.querySelector('h3'), description:card.querySelector('.stage-description'),
+ title:card.querySelector('h3').textContent, detail:card.querySelector('.stage-description').textContent,
+ order:card.querySelector('.n').textContent
+}));
+const resultIds = {check:'verifyText',generate:'collectText',curate:'curateText',train:'trainText',evaluate:'evalText'};
+const ratio = score => score ? `${score.successes}/${score.episodes}` : '';
+function methodStages(s) {
+ if (method === 'vla') {
+  if (!s.vla?.supported_scene) return {};
+  const v = s.vla.workflow || {}, score = v.unseen || v.familiar;
+  return {
+   check:['vla-check','Check the visual expert','Verify 10 scenes with the fixed-tick teacher.',v.ready,ratio(v.expert),'Run expert check'],
+   generate:['vla-record','Record demonstrations','Capture front and wrist images plus joint targets in 12 expert episodes.',
+    v.ready&&v.expert?.successes>=9,v.recording&&`${ratio(v.recording)} successful recordings`,'Record demonstrations'],
+   curate:['vla-prepare','Prepare the visual dataset','Split whole episodes and normalize joint targets.',
+    v.ready&&v.recording?.successes>=2,v.dataset&&`${v.dataset.train} train · ${v.dataset.validation} validation episodes`,'Prepare dataset'],
+   train:['vla-train','Train the camera policy','Fit the compact direct-action policy to expert sequences.',
+    v.ready&&v.dataset?.train&&v.dataset?.validation,v.trained&&`${v.trained.toLocaleString()} training updates saved`,v.trained?'Retrain VLA':'Train VLA'],
+   evaluate:['vla-evaluate','Evaluate the VLA','Check two familiar scenes before ten held-out scenes. Run episode requires qualification.',
+    v.ready&&v.trained,score&&`${ratio(score)} ${v.unseen?'held-out':'familiar'} placements · ${score.collisions} collision${score.collisions === 1 ? '' : 's'}`,'Evaluate VLA']
+  };
+ }
+ if (method === 'vlm') {
+  if (!s.vlm?.supported) return {};
+  const v = s.vlm, score = v.benchmark;
+  return {
+   check:['vlm-model','Check the local model','Load the pretrained Qwen3-VL inspector.',v.ready,v.ready?'Pretrained model installed':'','Check model'],
+   generate:['vlm-frames','Prepare inspection frames','Render verified overhead frames from saved expert or student rollouts.',
+    v.can_prepare,v.frames&&`${v.frames} saved overhead frames`,'Prepare frames'],
+   evaluate:['vlm-benchmark','Evaluate visual answers','Compare the model’s frame verdicts with simulator geometry on a balanced sample.',
+    v.ready&&v.can_benchmark,score&&`${score.correct}/${score.examples} matched simulator geometry`,'Evaluate VLM']
+  };
+ }
+ if (!usesSceneControls() || !supportsQwenTraining(s)) return {};
+ const ready = {check:true,generate:s.oracle?.success_rate>=.9,curate:Boolean(s.generation),
+  train:Boolean(s.curation?.selected_episodes&&s.model_ready),evaluate:s.adapter_ready&&s.model_ready};
+ return Object.fromEntries(pipelineCards.filter(({key}) => method==='qwen'||key==='check').map(({key,title,detail}) =>
+  [key,[key,title,detail,ready[key],savedSummary(key,s),key==='train'&&s.adapter_ready?'Retrain student':JOBS[key].button]]));
+}
+
 function renderPipeline(s){
- const showStages = supportsQwenTraining(s) && usesSceneControls();
+ const stages = methodStages(s), jobNames = Object.values(stages).map(stage => stage[0]);
+ const visualMethod = method === 'vla' || method === 'vlm';
+ const showStages = jobNames.length > 0;
  const pipeline = document.querySelector('.pipeline');
- pipeline.hidden = (!showStages && method !== 'vla') || !s.experiment;
- $('pipeline-title').textContent = method === 'expert' ? 'Expert verification' : 'Learning pipeline';
+ pipeline.hidden = !s.experiment || (!showStages && !visualMethod);
+ $('pipeline-title').textContent = ({expert:'Expert verification',qwen:'Learning pipeline',vla:'VLA learning pipeline',vlm:'VLM inspection pipeline'})[method] || 'Learning pipeline';
  const note = $('pipeline-note');
- note.hidden = method !== 'vla';
- note.textContent = !s.vla?.supported_scene ? 'Visual training currently supports the standard bowl scene.' :
-  s.vla.ready ? 'The evaluated visual policy can run above. Its development evaluation is in Reports.' :
-  'Visual training uses camera recordings and joint targets. Recording, training, and evaluation are run from the command line.';
+ note.hidden = !visualMethod;
+ note.textContent = method === 'vlm' ?
+  (!s.vlm?.supported ? 'Visual inspection supports the standard bowl and raised-shelf block.' :
+   !s.vlm.ready ? 'Install the local pretrained model to run inspection. Setup instructions are in docs/VLM.md.' :
+   'This workflow evaluates a pretrained model. Open Gallery to inspect or recheck individual frames.') :
+  !s.vla?.supported_scene ? 'Camera-based action training currently supports the standard bowl.' :
+  !s.vla.workflow?.ready ? 'Set up the isolated VLA environment to run these stages.' :
+  'Pass a held-out rollout evaluation before running the camera policy in the viewer.';
  $('job').hidden = !showStages;
  pipeline.querySelector('.stages').hidden = !showStages;
- const current=uiJob(s),visibleJob=showStages&&(!current.name?.startsWith('vla-'))&&(method==='qwen'||current.name==='check'),jobBusy=Boolean(current.running),busy=jobBusy||s.switching||s.vla?.running,history=s.jobs||{};
- const resultIds={check:'verifyText',generate:'collectText',curate:'curateText',train:'trainText',evaluate:'evalText'};
- for(const [name,id] of Object.entries(resultIds)){
-  const meta=JOBS[name],card=document.querySelector(`[data-stage="${name}"]`),button=card.querySelector('button[data-job]');
-  card.hidden = !showStages || (method === 'expert' && name !== 'check');
-  const record=current.name===name?current:(history[name]?.name?history[name]:{});
-  const saved = savedSummary(name,s);
-  const ready = name==='generate' ? s.oracle?.success_rate>=.9 : name==='curate' ? Boolean(s.generation) :
-   name==='train' ? Boolean(s.curation?.selected_episodes && s.model_ready) :
-   name==='evaluate' ? s.adapter_ready && s.model_ready : true;
+ const current=uiJob(s), visibleJob=jobNames.includes(current.name), jobBusy=Boolean(current.running),
+  busy=jobBusy||s.switching||s.vla?.running, history=s.jobs||{};
+ for(const {key, card, heading, description, order} of pipelineCards){
+  const stage = stages[key];
+  card.hidden = !stage;
+  if (!stage) continue;
+  const [name, title, detail, ready, saved, action] = stage;
+  heading.textContent = title;
+  description.textContent = detail;
+  card.querySelector('.n').textContent = method === 'vlm' ? ({check:'01 / MODEL',generate:'02 / FRAMES',evaluate:'03 / EVALUATE'})[key] : order;
+  const meta=JOBS[name], button=card.querySelector('button[data-job]');
+  button.dataset.job = name;
+  const record=current.name===name?current:(history[name]||{});
   const running = current.name === name && jobBusy;
   const status = running ? 'running' : ['failed','cancelled'].includes(record.status) ?
    record.status : saved ? 'complete' : ready ? 'ready' : 'pending';
   card.dataset.status=status;card.setAttribute('aria-busy',String(running));
   const statusText = running ? (current.pending ? 'Starting' : 'Running') :
    {complete:'✓ Complete',failed:'Failed',cancelled:'Stopped',ready:'Ready',pending:'Pending'}[status];
-  $('stage-status-'+name).textContent=statusText;
-  $(id).textContent=saved||'No saved result yet.';
+  $('stage-status-'+key).textContent=statusText;
+  $(resultIds[key]).textContent=saved||'No saved result yet.';
   const progress=record.progress||{},total=Number(progress.total),done=Number(progress.current),determinate=total>0&&Number.isFinite(done);
-  const bar=$('stage-progress-'+name);bar.hidden=!running;bar.classList.toggle('indeterminate',!determinate);
+  const bar=$('stage-progress-'+key);bar.hidden=!running;bar.classList.toggle('indeterminate',!determinate);
   if(determinate){const percentage=Math.max(0,Math.min(100,100*done/total));bar.firstElementChild.style.width=percentage+'%';bar.setAttribute('aria-valuemin','0');bar.setAttribute('aria-valuemax',String(total));bar.setAttribute('aria-valuenow',String(done))}
   else{bar.removeAttribute('aria-valuenow');bar.firstElementChild.style.width='35%'}
   bar.setAttribute('aria-valuetext',progress.message||statusText);
   button.disabled=busy||s.running||pendingRun||!ready;
-  const action = name === 'train' && s.adapter_ready ? 'Retrain student' : meta.button;
   const label = running ? (current.pending ? 'Starting…' : meta.working +
    (determinate ? ` ${done.toLocaleString()} / ${total.toLocaleString()}` : '…')) : action;
   buttonLabel(button,label,running);
@@ -307,14 +315,14 @@ function renderPipeline(s){
  $('job').style.display='block';$('job').dataset.status=status;$('job').setAttribute('aria-busy',String(jobBusy));$('job-spinner').hidden=!jobBusy;
  $('jobTitle').textContent=meta.title+(jobBusy?(current.pending?' is starting':' is running'):status==='complete'?' complete':status==='failed'?' failed':status==='cancelled'?' stopped':'');
  const message=current.progress?.message;
- $('job-summary').textContent=status==='failed'?(current.error||'This stage could not finish. Open Run details for the error.'):message&&message!=='Starting…'?message:jobBusy?'Preparing this stage. Progress will appear here.':savedSummary(current.name,s)||'This stage has finished.';
+ $('job-summary').textContent=status==='failed'?(current.error||'This stage could not finish. Open Run details for the error.'):message&&message!=='Starting…'?message:jobBusy?'Preparing this stage. Progress will appear here.':(Object.values(stages).find(stage=>stage[0]===current.name)?.[4]||'This stage has finished.');
  const log=(current.log||'').trim();$('job-details').hidden=!log;$('jobLog').textContent=log;
  if($('job-details').open)$('jobLog').scrollTop=$('jobLog').scrollHeight;
 }
-async function job(name, args={}){
+async function job(name){
  if(pendingJob||uiJob(state).running)return;
  requestError=null;pendingJob={name,id:null};renderWorkspace(state);
- try{const result=await post('/api/job',{name,...args});pendingJob.id=result.job_id}
+ try{const result=await post('/api/job',{name});pendingJob.id=result.job_id}
  catch(error){pendingJob=null;requestError={name,status:'failed',running:false,error:error.message};renderWorkspace(state)}
 }
 let experimentCatalog=[],pendingExperiment=null;
@@ -394,7 +402,6 @@ async function selectExperiment(id) {
 }
 
 function selectMethod(value, refresh = true) {
- if (value === 'vlm' && value !== method) inspectionScene = null;
  if (value !== method && method in seeds) seeds[method] = $('seed').value;
  method = value;
  methodPicker.value = value;
@@ -412,8 +419,6 @@ loadExperimentCatalog().catch(error => $('error').textContent = error.message);
 
 let loadingFrame = false, frameRevision = null;
 function frameSource(s) {
- const row = inspectionCase(s);
- if (row) return {key:'inspection:' + inspectionScene + ':' + row.id, inspection: row.image};
  if (visualRun(s)) return {key: 'vla:' + (pendingVla ? 'pending' : s.vla?.id), visual: true};
  return {key: 'scene:' + (pendingExperiment || s.experiment?.id), visual: false};
 }
@@ -421,12 +426,12 @@ function syncFrame(s) {
  const source = frameSource(s);
  if (viewport.dataset.frameKey !== source.key) {
   viewport.dataset.frameKey = source.key;
-  viewport.dataset.source = source.inspection ? 'inspection' : source.visual ? 'vla' : 'scene';
+  viewport.dataset.source = source.visual ? 'vla' : 'scene';
   const image = $('frame');
   if (image.src.startsWith('blob:')) URL.revokeObjectURL(image.src);
   image.removeAttribute('src');
   image.style.visibility = 'hidden';
-  image.alt = source.inspection ? 'Saved final frame for visual inspection' : source.visual ? 'Live VLA front and wrist cameras' : 'Live robot simulation';
+  image.alt = source.visual ? 'Live VLA front and wrist cameras' : 'Live robot simulation';
   $('loading').style.display = '';
   $('loading').lastChild.textContent = source.visual ? ' Loading visual policy…' : ' Preparing the simulation…';
   frameRevision = null;
@@ -435,11 +440,10 @@ function syncFrame(s) {
 async function frame() {
  const source = frameSource(state), v = state.vla;
  if (loadingFrame || !state.ready || pendingExperiment || state.switching ||
- (source.inspection && $('frame').style.visibility === 'visible') ||
  (source.visual && (pendingVla || !v?.has_frame || (!v.running && frameRevision === v.frame_revision)))) return;
  loadingFrame = true;
  try {
-  const path = source.inspection || (source.visual ? '/api/vla/frame.jpg' : '/frame.jpg');
+  const path = source.visual ? '/api/vla/frame.jpg' : '/frame.jpg';
   const response = await fetch(path + '?t=' + Date.now());
   if (!response.ok) return;
   const blob = await response.blob();
@@ -463,45 +467,60 @@ function updateConnection(s){
  indicator.title=label;$('dot').classList.toggle('pulse',Boolean(working));
 }
 function renderMeasurements(s) {
- const expertTest = s.results?.expert, expert = expertTest || s.oracle, student = s.results?.student;
- const visual = method === 'vla' && s.vla?.ready && s.vla?.supported_scene ?
-  s.vla.candidates?.[0]?.evaluation : null;
- const skillTrial = s.experiment?.physics?.learning_enabled === false;
- $('metrics-card').hidden = !(visual || (usesSceneControls() && !skillTrial));
- $('expert-metric').hidden = method === 'vla';
+ const isVla = method === 'vla', isVlm = method === 'vlm';
+ const classic = usesSceneControls() && s.experiment?.physics?.learning_enabled !== false;
+ const vla = s.vla?.workflow || {}, vlm = s.vlm?.benchmark;
+ const supported = isVla ? s.vla?.supported_scene : isVlm ? s.vlm?.supported : classic;
+ $('metrics-card').hidden = !supported;
+ $('evaluation-links').hidden = !(isVla || isVlm);
+ const query = new URLSearchParams({experiment:s.experiment?.id || 'so101-bowl', policy:method});
+ $('evaluation-gallery').href = '/gallery?' + query;
+ $('evaluation-report').href = '/reports?' + query;
+ $('expert-metric').hidden = false;
  $('student-metric').hidden = method === 'expert';
- $('expert-metric-label').textContent = expertTest ? 'EXPERT TEST' : 'EXPERT CHECK';
- $('expertMetric').textContent = expert ? `${expert.successes}/${expert.episodes}` : '—';
- $('expertCaption').textContent = expertTest ? 'Held-out scenes' : expert ? 'Randomized scene check' : 'Expert check pending';
- $('student-metric-label').textContent = visual ? 'VISUAL POLICY' : 'STUDENT TEST';
- $('studentMetric').textContent = visual ? `${visual.unseen_successes}/${visual.unseen_episodes}` :
-  student ? `${student.successes}/${student.episodes}` : '—';
- $('studentCaption').textContent = visual ? 'Unseen development scenes' : student ?
-  (student.complete_benchmark ? '100 held-out scenes' : 'Partial evaluation') : 'Evaluation pending';
- $('metrics-note').hidden = method !== 'qwen';
+ const expertTest = s.results?.expert, expert = expertTest || s.oracle, student = s.results?.student;
+ let first = [expertTest ? 'EXPERT TEST' : 'EXPERT CHECK', ratio(expert) || '—',
+  expertTest ? 'Held-out scenes' : expert ? 'Randomized scene check' : 'Expert check pending'];
+ let second = ['STUDENT TEST', ratio(student) || '—',
+  student?.complete_benchmark ? '100 held-out scenes' : student ? 'Partial evaluation' : 'Evaluation pending'];
+ let note = method === 'qwen' ? 'Student scores use scenes reserved for evaluation.' : '';
+ if (isVla) {
+  const score = vla.unseen || vla.familiar;
+  first = ['VISUAL EXPERT CHECK', ratio(vla.expert) || '—', 'Fixed-tick scripted expert'];
+  second = ['VLA PLACEMENTS', ratio(score) || '—', score ?
+   `${vla.unseen ? 'Held-out' : 'Familiar'} scenes · ${score.collisions} collision${score.collisions === 1 ? '' : 's'}` : 'Evaluation pending'];
+  note = s.vla.ready ? 'A qualified visual policy is available for live episodes.' :
+   'Familiar scenes check the training path. Live runs require a qualifying held-out evaluation.';
+ } else if (isVlm) {
+  first = ['VLM MATCHES', vlm ? `${vlm.correct}/${vlm.examples}` : '—', 'Agreement with simulator geometry'];
+  second = ['MEAN INFERENCE', vlm?.latency_ms != null ? `${(vlm.latency_ms/1000).toFixed(1)} s` : '—',
+   vlm ? `${vlm.uncertain} uncertain answers` : 'Evaluation pending'];
+  note = 'This test checks object fit inside the outline. Gallery contains the images and inspection traces.';
+ }
+ for (const [ids, data] of [[['expert-metric-label','expertMetric','expertCaption'],first],
+                             [['student-metric-label','studentMetric','studentCaption'],second]]) {
+  ids.forEach((id,i) => $(id).textContent = data[i]);
+ }
+ $('metrics-note').hidden = !note;
+ $('metrics-note').textContent = note;
 }
 
 function renderEpisode(s) {
  const o = s.observation || {}, v = s.vla || {};
  const visual = visualRun(s);
  const match = usesSceneControls() && s.policy === currentPolicy();
- const inspection = inspectionCase(s);
  const hammer = ['hammer_nail','hammer_pine','impact_nail'].includes(o.task);
  const suffix = hammer && usesSceneControls() ? ` · NAIL ${Math.round(o.nail_depth*1000)} / ${Math.round(o.target_depth*1000)} mm` :
   o.target_velocity ? ` · PLATFORM ${Math.round(Math.abs(o.target_velocity[1])*1000)} mm/s` : '';
- $('trace-card').hidden = !usesSceneControls();
+ $('trace-card').hidden = !usesSceneControls() && method !== 'vla';
+ $('trace-heading').textContent = method === 'vla' ? 'Replan trace' : 'Action trace';
  $('run-report').hidden = !(visualEpisode(s) && v.report_url && !pendingVla);
  if (!$('run-report').hidden) $('run-report').href = v.report_url;
- $('scene').textContent = inspection ? `FINAL FRAME · SEED ${inspection.seed}` : visual ? (pendingVla || !v.has_frame ? 'Preparing policy cameras' :
+ $('scene').textContent = visual ? (pendingVla || !v.has_frame ? 'Preparing policy cameras' :
   `SEED ${v.seed} · TICK ${v.tick || 0} / ${v.max_ticks || 240}`) :
   s.ready ? `SEED ${s.seed} · ${match ? 'DECISION ' + (o.step || 0) + ' · ' : ''}${s.camera?.toUpperCase() || 'FRONT'}${suffix}` : 'Waiting for scene';
  let message = '';
- if (inspection) {
-  const active = uiJob(s), result = s.vlm?.latest;
-  message = active.name === 'vlm-inspect' && active.running ? 'Inspecting the image…' :
-   active.name === 'vlm-inspect' && active.status === 'failed' ? (active.error || 'Inspection failed.') :
-   result?.id === inspection.id ? `Model: ${result.answer} · Simulator: ${result.expected} · ${(result.latency_ms/1000).toFixed(1)} s` : '';
- } else if (visualEpisode(s)) {
+ if (visualEpisode(s)) {
   message = pendingVla || v.phase === 'loading' ? 'Loading visual policy…' : v.phase === 'stopping' ? 'Stopping…' :
    v.running ? ('Executing joint targets' + (typeof v.inference_ms === 'number' ? ` · ${v.inference_ms.toFixed(0)} ms last inference` : '')) : v.phase === 'failed' ? (v.error || 'The rollout failed.') :
    v.phase === 'stopped' ? 'Episode stopped.' : v.success ? 'Placement completed.' :
@@ -514,19 +533,21 @@ function renderEpisode(s) {
    s.success === false ? 'Episode ended · ' + s.result : s.running ? 'Executing ' + (s.history.at(-1)?.action || 'first action') : '';
  }
  $('result').textContent = message;
- $('step').textContent = `${match ? o.step || 0 : 0} / ${s.experiment?.simulation?.max_steps || 15}`;
- const trace = match ? s.history || [] : [];
+ $('step').textContent = method === 'vla' ? (visual ? `${v.tick || 0} ticks` : '') : `${match ? o.step || 0 : 0} / ${s.experiment?.simulation?.max_steps || 15}`;
+ const trace = method === 'vla' ? (visual ? v.trace || [] : []) : match ? s.history || [] : [];
  $('actions').replaceChildren();
  if (!trace.length) {
   const item = document.createElement('li');
-  item.textContent = 'Run an episode to see each decision.';
+  item.textContent = method === 'vla' ?
+   'A live run shows replans here. Saved evaluation traces are in Gallery.' : 'Run an episode to see each decision.';
   $('actions').append(item);
  }
  trace.forEach((action, i) => {
   const item = document.createElement('li'), n = document.createElement('span'), value = document.createElement('span');
   n.className = 'num';
-  n.textContent = String(i + 1).padStart(2, '0');
-  value.textContent = actionLabel(action);
+  n.textContent = method === 'vla' ? String(action.tick) : String(i + 1).padStart(2, '0');
+  value.textContent = method === 'vla' ? `Replan · ${action.milliseconds.toFixed(1)} ms` +
+   (action.first_target_rad ? ' · ' + action.first_target_rad.map(v=>v.toFixed(2)).join(', ') + ' rad' : '') : actionLabel(action);
   item.append(n, value);
   $('actions').append(item);
  });
@@ -535,7 +556,6 @@ function renderEpisode(s) {
 
 function renderWorkspace(s) {
  syncExperiment(s);
- syncInspection(s);
  renderViewer(s);
  renderTrainingShortcut(s);
  renderPlayback(s);

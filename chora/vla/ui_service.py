@@ -129,6 +129,12 @@ class VLAService:
                 self.stop_at = time.monotonic()
                 self.directory.with_suffix('.stop').touch()
 
+    def reset(self):
+        with self.lock:
+            if self.running:
+                raise ValueError("Stop the visual policy before resetting")
+            self.process = self.directory = self.log = self.run_id = self.stop_at = None
+
     def status(self):
         with self.lock:
             if self.running and self.stop_at and time.monotonic()-self.stop_at > 5:

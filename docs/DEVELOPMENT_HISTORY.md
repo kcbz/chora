@@ -244,3 +244,7 @@ or validated real material behavior.
 - Added a direct-action VLA pilot. It placed the bowl on one familiar seed
   and collided on the second. Faster replanning timed out on both seeds. The
   checkpoint did not qualify for use from the lab.
+
+- Added a five-stage VLA learning pipeline and a three-stage pretrained VLM
+  inspection pipeline. The lab shows aggregate scores in Evaluation. Gallery
+  shows saved VLA replans and full VLM frames with per-episode inspection traces.

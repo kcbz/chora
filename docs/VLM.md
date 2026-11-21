@@ -1,11 +1,16 @@
 # Visual inspection
 
-Choose **VLM · Visual inspection** for the standard bowl or raised-shelf block,
-select a saved episode, and click **Inspect frame**. The model gets the saved
-overhead final image and one fixed question about whether the object fits inside the
-marked target. Chora shows the answer beside the simulator's geometric answer.
-The model cannot move the arm. A final frame cannot establish stable placement
-over time, so the geometric answer measures horizontal fit only.
+Choose **VLM · Visual inspection** for the Standard bowl or raised-shelf block.
+In the lab, the **VLM inspection pipeline** loads the pretrained model, prepares
+overhead frames from scored episodes, and runs a benchmark. **Evaluation** shows
+geometry matches, uncertainty, and latency.
+
+Open **Gallery**, select a saved episode, and use **Inspect frame** to run the
+model again. The modal shows the full overhead image, the model's answer beside
+the simulator's geometric answer, and a trace with the question, raw answer,
+model, and latency. The VLM answers a question about horizontal fit in a saved
+image. It uses pretrained weights, and inspecting a frame sends no commands
+to the arm.
 
 The model is the local [MLX 4-bit Qwen3-VL-2B-Instruct variant](https://huggingface.co/mlx-community/Qwen3-VL-2B-Instruct-4bit) pinned in
 `chora/visual_inspection.py`. It runs on Apple Silicon in an optional environment.

@@ -1,5 +1,5 @@
 from chora.common import save_json
-from chora.visual_inspection import cases, inspect_case, public_cases
+from chora.visual_inspection import answer_for, cases, inspect_case, public_cases
 
 
 def test_inspection_uses_only_verified_overhead_frames_and_compares_geometry(tmp_path):
@@ -27,3 +27,8 @@ def test_inspection_uses_only_verified_overhead_frames_and_compares_geometry(tmp
     assert report["answer"] == "no"
     assert report["expected"] == "yes"
     assert report["correct"] is False
+
+    save_json(tmp_path / "vlm/answers/student-100000.json", report)
+    assert answer_for("so101-bowl", tmp_path, "student-100000") == report
+    frame.write_bytes(b"replacement frame")
+    assert answer_for("so101-bowl", tmp_path, "student-100000") is None
