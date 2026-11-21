@@ -178,7 +178,7 @@ function renderViewer(s) {
   method === 'expert' || (method === 'qwen' && !qwenStatus(s));
  const availability =  method === 'planner' ? 'Planned pilot: a Qwen planner calls checked robot skills and uses simulation feedback to recover.' :
   isVisual && !v.supported_scene ? 'VLA currently supports Bowl · Standard platform.' :
-  isVisual && !canRun ? (v.unavailable_reason || 'A visual policy is not available for this scene.') :
+  isVisual && !canRun ? vlaRunRequirement(v) :
   method === 'qwen' ? (qwenStatus(s) ||
    (!s.results?.student ? 'Trained and ready to run. Evaluate student to publish scores and gallery previews.' : '')) : '';
  $('method-status').hidden = !availability;
@@ -224,6 +224,26 @@ const pipelineCards = [...document.querySelectorAll('[data-stage]')].map(card =>
 }));
 const resultIds = {check:'verifyText',generate:'collectText',curate:'curateText',train:'trainText',evaluate:'evalText'};
 const ratio = score => score ? `${score.successes}/${score.episodes}` : '';
+
+function vlaEvaluationOutcome(workflow = {}) {
+ const {familiar, unseen} = workflow;
+ if (unseen) return unseen.episodes >= 10 && unseen.successes / unseen.episodes >= .8 && !unseen.collisions
+  ? 'passed' : 'did-not-pass';
+ if (familiar && (familiar.successes < 2 || familiar.collisions)) return 'did-not-pass';
+ return null;
+}
+
+function vlaRunRequirement(visual) {
+ const {familiar, unseen, trained} = visual.workflow || {};
+ if (vlaEvaluationOutcome(visual.workflow) === 'did-not-pass') {
+  if (unseen) return 'Held-out evaluation fell short. Run episode requires at least 8 of 10 placements with zero collisions.';
+  const collisions = familiar.collisions ? ` with ${familiar.collisions} collision${familiar.collisions === 1 ? '' : 's'}` : '';
+  return `Familiar evaluation passed ${ratio(familiar)} trials${collisions}. Both must pass without collisions before held-out evaluation can start.`;
+ }
+ if (trained && !unseen) return 'Training finished. Evaluate the checkpoint to qualify it for live runs.';
+ return visual.unavailable_reason || 'A visual policy is not available for this scene.';
+}
+
 function methodStages(s) {
  if (method === 'vla') {
   if (!s.vla?.supported_scene) return {};
@@ -276,6 +296,7 @@ function renderPipeline(s){
   'Pass a held-out rollout evaluation before running the camera policy in the viewer.';
  $('job').hidden = !showStages;
  pipeline.querySelector('.stages').hidden = !showStages;
+ const vlaOutcome = vlaEvaluationOutcome(s.vla?.workflow);
  const current=uiJob(s), visibleJob=jobNames.includes(current.name), jobBusy=Boolean(current.running),
   busy=jobBusy||s.switching||s.vla?.running, history=s.jobs||{};
  for(const {key, card, heading, description, order} of pipelineCards){
@@ -291,10 +312,10 @@ function renderPipeline(s){
   const record=current.name===name?current:(history[name]||{});
   const running = current.name === name && jobBusy;
   const status = running ? 'running' : ['failed','cancelled'].includes(record.status) ?
-   record.status : saved ? 'complete' : ready ? 'ready' : 'pending';
+   record.status : (name === 'vla-evaluate' && vlaOutcome) || (saved ? 'complete' : ready ? 'ready' : 'pending');
   card.dataset.status=status;card.setAttribute('aria-busy',String(running));
   const statusText = running ? (current.pending ? 'Starting' : 'Running') :
-   {complete:'✓ Complete',failed:'Failed',cancelled:'Stopped',ready:'Ready',pending:'Pending'}[status];
+   {complete:'✓ Complete',passed:'✓ Passed','did-not-pass':'Did not pass',failed:'Job failed',cancelled:'Stopped',ready:'Ready',pending:'Pending'}[status];
   $('stage-status-'+key).textContent=statusText;
   $(resultIds[key]).textContent=saved||'No saved result yet.';
   const progress=record.progress||{},total=Number(progress.total),done=Number(progress.current),determinate=total>0&&Number.isFinite(done);
@@ -313,7 +334,8 @@ function renderPipeline(s){
  if(!current.name||!visibleJob){$('job').style.display='none';return}
  const meta=JOBS[current.name]||{title:'Pipeline stage'},status=current.status||(current.running?'running':current.exit_code===0?'complete':'idle');
  $('job').style.display='block';$('job').dataset.status=status;$('job').setAttribute('aria-busy',String(jobBusy));$('job-spinner').hidden=!jobBusy;
- $('jobTitle').textContent=meta.title+(jobBusy?(current.pending?' is starting':' is running'):status==='complete'?' complete':status==='failed'?' failed':status==='cancelled'?' stopped':'');
+ const evaluationResult = current.name === 'vla-evaluate' && status === 'complete' ? vlaOutcome : null;
+ $('jobTitle').textContent = evaluationResult === 'did-not-pass' ? 'VLA evaluation did not pass' : meta.title+(jobBusy?(current.pending?' is starting':' is running'):status==='complete'?' complete':status==='failed'?' failed':status==='cancelled'?' stopped':'');
  const message=current.progress?.message;
  $('job-summary').textContent=status==='failed'?(current.error||'This stage could not finish. Open Run details for the error.'):message&&message!=='Starting…'?message:jobBusy?'Preparing this stage. Progress will appear here.':(Object.values(stages).find(stage=>stage[0]===current.name)?.[4]||'This stage has finished.');
  const log=(current.log||'').trim();$('job-details').hidden=!log;$('jobLog').textContent=log;
@@ -490,7 +512,7 @@ function renderMeasurements(s) {
   second = ['VLA PLACEMENTS', ratio(score) || '—', score ?
    `${vla.unseen ? 'Held-out' : 'Familiar'} scenes · ${score.collisions} collision${score.collisions === 1 ? '' : 's'}` : 'Evaluation pending'];
   note = s.vla.ready ? 'A qualified visual policy is available for live episodes.' :
-   'Familiar scenes check the training path. Live runs require a qualifying held-out evaluation.';
+   vlaRunRequirement(s.vla);
  } else if (isVlm) {
   first = ['VLM MATCHES', vlm ? `${vlm.correct}/${vlm.examples}` : '—', 'Agreement with simulator geometry'];
   second = ['MEAN INFERENCE', vlm?.latency_ms != null ? `${(vlm.latency_ms/1000).toFixed(1)} s` : '—',
