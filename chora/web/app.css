@@ -79,3 +79,12 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 [hidden]{display:none!important}
 
 .evaluation-links{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;margin-top:12px}
+
+.training-activity[data-status="failed"]{color:var(--error)}
+.training-activity[data-status="pending"]{color:var(--muted)}
+.vla-report .card{margin-bottom:14px}
+.vla-report .report-links{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:14px}
+.vla-report table{width:100%;border-collapse:collapse;text-align:left;font-size:13px}
+.vla-report :is(th,td){border-bottom:1px solid var(--line);padding:8px}
+.vla-report .trial-failure{color:var(--error)}
+.vla-report .trial-table{overflow-x:auto}

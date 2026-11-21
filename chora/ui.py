@@ -17,7 +17,7 @@ CONTROL_METHODS = {
     "expert": ("Scripted expert", "Run the programmed controller for this scene."),
     "qwen": ("Qwen · State-based imitation", "Learn high-level actions from structured simulator state."),
     "vla": ("VLA · Camera-based control", "Predict joint targets from camera frames, an instruction, and joint state."),
-    "vlm": ("VLM · Visual inspection", "Use images and questions to inspect the scene and describe the result."),
+    "vlm": ("VLM · Visual inspection", "The VLM answers questions about saved images. Open Gallery to inspect a frame."),
     "planner": ("Skill Orchestrator", "Plan the job, call a robot skill, and check the result before moving on."),
 }
 
@@ -103,18 +103,9 @@ def policy_results(experiment, policy, active, vla_status=None):
             return render_shell(saved.read_text(), active, experiment, policy)
         detail = "Run the scene's evaluations to see its report here."
     elif policy == "vla":
-        from .vla.workflow import status
+        from .vla.report import render
 
-        workflow = status(directory) if experiment == DEFAULT else {}
-        score = workflow.get("unseen") or workflow.get("familiar")
-        if experiment != DEFAULT:
-            detail = "Visual policy evaluation currently supports the standard bowl scene."
-        elif score:
-            split = "held-out" if workflow.get("unseen") else "familiar"
-            collisions = score["collisions"]
-            detail = f'{score["successes"]}/{score["episodes"]} {split} placements. {collisions} collision{"s" if collisions != 1 else ""}. View the saved trials in Gallery.'
-        else:
-            detail = "Train and evaluate a camera policy to see the rollout scores."
+        return render(experiment, vla_status)
     elif policy == "vlm":
         benchmark = read_json(directory / "vlm/benchmark.json", {})
         if benchmark.get("view") == "overhead":

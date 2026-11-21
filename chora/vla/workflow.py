@@ -54,11 +54,26 @@ def summary(report):
                 collisions=sum(t.get("collisions", 0) for t in trials))
 
 
+def familiar_passed(score):
+    return score["successes"] == score["episodes"] == 2 and score["collisions"] == 0
+
+
+def evaluation_outcome(familiar, unseen):
+    if unseen:
+        passed = (unseen["episodes"] >= 10 and unseen["successes"] / unseen["episodes"] >= .8
+                  and unseen["collisions"] == 0)
+        return "passed" if passed else "did-not-pass"
+    if familiar and not familiar_passed(familiar):
+        return "did-not-pass"
+    return None
+
+
 def status(directory):
     d = details(directory)
     recording = d["recording"]
     episodes = d["dataset"].get("episodes", [])
     training = d["training"]
+    familiar, unseen = summary(d["familiar"]), summary(d["unseen"])
     return {
         "ready": (ROOT / ".venv-vla/bin/python").is_file(),
         "expert": d["expert"] or None,
@@ -67,8 +82,9 @@ def status(directory):
         "dataset": {"train": sum(e["split"] == "train" for e in episodes),
                     "validation": sum(e["split"] == "validation" for e in episodes)} if episodes else None,
         "trained": training.get("final", {}).get("step") if training.get("status") == "complete" else None,
-        "familiar": summary(d["familiar"]),
-        "unseen": summary(d["unseen"]),
+        "familiar": familiar,
+        "unseen": unseen,
+        "evaluation_outcome": evaluation_outcome(familiar, unseen),
     }
 
 
@@ -165,7 +181,7 @@ def run(stage):
         saved["familiar"] = str(result.relative_to(OUTPUT / "vla"))
         saved.pop("unseen", None)
         score = summary(read_json(result / "report.json"))
-        if score["successes"] == 2 and score["collisions"] == 0:
+        if familiar_passed(score):
             known = {row["seed"] for row in rows}
             heldout = [seed for seed in range(25000, 26000) if seed not in known][:10]
             result = rollout(model, dataset, output=directory("rollouts", "unseen"),

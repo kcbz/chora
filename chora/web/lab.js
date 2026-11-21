@@ -142,6 +142,38 @@ function qwenStatus(s) {
  if (!s.model_ready) return 'The Qwen base model is missing. Run the Chora setup to restore it.';
  return '';
 }
+function trainingStatus(s, active) {
+ if (active.running) return ['running', JOBS[active.name]?.working || 'Working'];
+ if (s.switching || pendingExperiment) return ['running','Loading scene'];
+ if (s.vla?.running) return ['running','Running visual policy'];
+ if (s.running) return ['running','Running episode'];
+
+ const stages = Object.values(methodStages(s));
+ const byName = new Map(stages.map(([name, title]) => [name, title]));
+ const latest = byName.has(active.name) ? active : Object.values(s.jobs || {})
+  .filter(job => byName.has(job.name))
+  .sort((a,b) => (b.started_at || 0) - (a.started_at || 0))[0];
+ if (latest && ['failed','cancelled'].includes(latest.status)) {
+  const outcome = latest.status === 'cancelled' ? 'Stopped' : 'Job failed';
+  return ['failed', `${byName.get(latest.name)} · ${outcome}`];
+ }
+
+ if (method === 'vla' && s.vla?.supported_scene) {
+  const workflow = s.vla.workflow || {};
+  if (workflow.evaluation_outcome === 'did-not-pass') return ['failed','Evaluate the VLA · Did not pass'];
+  if (s.vla.ready) return ['complete','VLA ready to run'];
+  if (workflow.evaluation_outcome === 'passed') return ['pending','Evaluation passed · Checkpoint unavailable'];
+  if (workflow.trained) return ['pending','Training complete · Evaluate the VLA'];
+  if (!workflow.ready) return ['pending','VLA setup required'];
+ }
+ if (method === 'qwen' && s.adapter_ready) {
+  return s.results?.student ? ['complete','Student evaluation complete'] : ['pending','Training complete · Evaluate student'];
+ }
+ if (method === 'vlm' && s.vlm?.benchmark) return ['complete','VLM benchmark complete'];
+ const next = stages.find(([, , , , saved]) => !saved);
+ return next ? ['pending', `Next · ${next[1]}`] : ['', ''];
+}
+
 function renderTrainingShortcut(s) {
  const visualTraining = method === 'vla' && s.vla?.supported_scene;
  const inspectionPipeline = method === 'vlm' && s.vlm?.supported;
@@ -149,13 +181,15 @@ function renderTrainingShortcut(s) {
  const shortcut = $('training-shortcut');
  shortcut.hidden = !visualTraining && !qwenTraining && !inspectionPipeline;
  const active = uiJob(s);
- const label = active.running ? (JOBS[active.name]?.working || 'Working') : s.vla?.running ?
-  'Running visual policy' : s.switching || pendingExperiment ? 'Loading scene' : s.running ? 'Running episode' : '';
+ const [status, label] = trainingStatus(s, active);
  const progress = active.progress || {};
  const counts = active.running && Number.isFinite(progress.current) && progress.total > 0 ?
   ` · ${progress.current.toLocaleString()}/${progress.total.toLocaleString()}` : '';
  $('training-tools').hidden = shortcut.hidden && !label;
- $('training-activity').hidden = !label;
+ const activity = $('training-activity');
+ activity.hidden = !label;
+ activity.dataset.status = status;
+ activity.querySelector('.spinner').hidden = status !== 'running';
  if ($('training-activity-label').textContent !== label + counts) $('training-activity-label').textContent = label + counts;
  shortcut.disabled = Boolean((method === 'expert' && methodPicker.disabled) || s.switching || pendingExperiment);
  shortcut.textContent = inspectionPipeline ? 'Go to inspection pipeline ↓' : 'Go to training ↓';
@@ -225,17 +259,9 @@ const pipelineCards = [...document.querySelectorAll('[data-stage]')].map(card =>
 const resultIds = {check:'verifyText',generate:'collectText',curate:'curateText',train:'trainText',evaluate:'evalText'};
 const ratio = score => score ? `${score.successes}/${score.episodes}` : '';
 
-function vlaEvaluationOutcome(workflow = {}) {
- const {familiar, unseen} = workflow;
- if (unseen) return unseen.episodes >= 10 && unseen.successes / unseen.episodes >= .8 && !unseen.collisions
-  ? 'passed' : 'did-not-pass';
- if (familiar && (familiar.successes < 2 || familiar.collisions)) return 'did-not-pass';
- return null;
-}
-
 function vlaRunRequirement(visual) {
  const {familiar, unseen, trained} = visual.workflow || {};
- if (vlaEvaluationOutcome(visual.workflow) === 'did-not-pass') {
+ if (visual.workflow?.evaluation_outcome === 'did-not-pass') {
   if (unseen) return 'Held-out evaluation fell short. Run episode requires at least 8 of 10 placements with zero collisions.';
   const collisions = familiar.collisions ? ` with ${familiar.collisions} collision${familiar.collisions === 1 ? '' : 's'}` : '';
   return `Familiar evaluation passed ${ratio(familiar)} trials${collisions}. Both must pass without collisions before held-out evaluation can start.`;
@@ -296,7 +322,7 @@ function renderPipeline(s){
   'Pass a held-out rollout evaluation before running the camera policy in the viewer.';
  $('job').hidden = !showStages;
  pipeline.querySelector('.stages').hidden = !showStages;
- const vlaOutcome = vlaEvaluationOutcome(s.vla?.workflow);
+ const vlaOutcome = s.vla?.workflow?.evaluation_outcome;
  const current=uiJob(s), visibleJob=jobNames.includes(current.name), jobBusy=Boolean(current.running),
   busy=jobBusy||s.switching||s.vla?.running, history=s.jobs||{};
  for(const {key, card, heading, description, order} of pipelineCards){
@@ -417,6 +443,7 @@ function syncExperiment(s) {
 
 async function selectExperiment(id) {
  if (id === state.experiment?.id) return;
+ requestError = null;
  pendingExperiment = id;
  renderWorkspace(state);
  try { await post('/api/experiment', {id}); }
@@ -497,6 +524,7 @@ function renderMeasurements(s) {
  $('evaluation-links').hidden = !(isVla || isVlm);
  const query = new URLSearchParams({experiment:s.experiment?.id || 'so101-bowl', policy:method});
  $('evaluation-gallery').href = '/gallery?' + query;
+ $('evaluation-gallery').textContent = isVlm ? 'Inspect saved frames ↗' : 'Gallery ↗';
  $('evaluation-report').href = '/reports?' + query;
  $('expert-metric').hidden = false;
  $('student-metric').hidden = method === 'expert';
