@@ -124,3 +124,15 @@ def test_explicit_action_order_survives_checkpoint_and_is_not_trainable(model, t
         mem, pad = restored.condition(visual, rt, rv, proprio)
         actual = restored.sample(mem, pad)
     torch.testing.assert_close(actual, expected, atol=0, rtol=0)
+
+
+def test_direct_action_pilot_loss_matches_inference_and_masks_tail(model):
+    model.cfg.direct_actions = True
+    memory, pad = model.condition(*inputs(model))
+    targets = torch.randn(1, 4, 6)
+    valid = torch.tensor([[True, True, False, False]])
+    prediction = model.sample(memory, pad)
+    expected = (prediction[:, :2] - targets[:, :2]).square().mean()
+    torch.testing.assert_close(model.direct_loss(memory, pad, targets, valid), expected)
+    targets[:, 2:] = 1e6
+    torch.testing.assert_close(model.direct_loss(memory, pad, targets, valid), expected)

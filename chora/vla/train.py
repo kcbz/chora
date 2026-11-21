@@ -136,7 +136,7 @@ def restore_training_state(path, optimizer, generator, sampler, signature):
 
 @exclusive_job("vla-train")
 def run(dataset, *, steps=300, batch_size=4, overfit_windows=8, output=None, device="auto",
-        learning_rate=.0003, seed=42, eval_every=50, resume=None):
+        learning_rate=.0003, seed=42, eval_every=50, resume=None, direct_pilot=False):
     if not 1 <= steps <= 100000 or not 1 <= batch_size <= 16 or not 0 <= overfit_windows <= 1024 or eval_every < 1:
         raise ValueError("Invalid training size/settings")
     if not 0 < learning_rate <= .01:
@@ -153,6 +153,9 @@ def run(dataset, *, steps=300, batch_size=4, overfit_windows=8, output=None, dev
         torch.set_num_threads(min(8, torch.get_num_threads()))
     torch.manual_seed(seed)
     settings = yaml.safe_load((ROOT / "configs/vla.yaml").read_text())
+    if direct_pilot:
+        settings["model"].update(direct_actions=True, pooled_grid=4, width=128, heads=4,
+                                 fusion_layers=2, decoder_layers=2, flow_steps=1)
     cfg = ModelConfig(**settings["model"])
     train = ChunkDataset(dataset, "train", chunk=cfg.chunk)
     validation = ChunkDataset(dataset, "validation", chunk=cfg.chunk)
@@ -218,9 +221,12 @@ def run(dataset, *, steps=300, batch_size=4, overfit_windows=8, output=None, dev
             optimizer.zero_grad(set_to_none=True)
             memory, pad = model.condition(batch["visual"], text.expand(batch_size, -1, -1),
                                            text_valid.expand(batch_size, -1), batch["proprio"])
-            noise = torch.randn(batch["targets"].shape, generator=noise_rng).to(device)
-            t = torch.rand(batch_size, generator=noise_rng).to(device)
-            loss = model.flow_loss(memory, pad, batch["targets"], batch["valid"], noise=noise, t=t)
+            if cfg.direct_actions:
+                loss = model.direct_loss(memory, pad, batch["targets"], batch["valid"])
+            else:
+                noise = torch.randn(batch["targets"].shape, generator=noise_rng).to(device)
+                t = torch.rand(batch_size, generator=noise_rng).to(device)
+                loss = model.flow_loss(memory, pad, batch["targets"], batch["valid"], noise=noise, t=t)
             loss.backward()
             norm = torch.nn.utils.clip_grad_norm_([p for p in model.parameters() if p.requires_grad], 1.)
             if not torch.isfinite(loss) or not torch.isfinite(norm):
@@ -228,7 +234,7 @@ def run(dataset, *, steps=300, batch_size=4, overfit_windows=8, output=None, dev
             optimizer.step()
             if step == start_step+1 or step % 25 == 0 or step == steps:
                 job_progress(step,steps,f"Training visual policy · update {step:,} of {steps:,}")
-            row = {"step": step, "flow_loss": float(loss.detach().cpu()), "gradient_norm": float(norm.cpu())}
+            row = {"step": step, ("action_loss" if cfg.direct_actions else "flow_loss"): float(loss.detach().cpu()), "gradient_norm": float(norm.cpu())}
             with (path / "metrics.jsonl").open("a") as f:
                 f.write(json.dumps(row) + "\n")
             if step % eval_every == 0 or step == steps:
@@ -278,6 +284,7 @@ def main():
     parser.add_argument("--learning-rate", type=float, default=.0003)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--eval-every", type=int, default=50)
+    parser.add_argument("--direct-pilot", action="store_true", help="Fit a compact direct action decoder")
     parser.add_argument("--resume", help="Resume a completed optimizer/model checkpoint into a new run")
     print(run(**vars(parser.parse_args())))
 

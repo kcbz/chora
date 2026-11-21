@@ -31,9 +31,10 @@ class ModelConfig:
     flow_steps: int = 4
     proprio_broadcast: bool = False
     sinusoidal_action_positions: bool = False
+    direct_actions: bool = False
 
     def __post_init__(self):
-        flags = {"proprio_broadcast", "sinusoidal_action_positions"}
+        flags = {"proprio_broadcast", "sinusoidal_action_positions", "direct_actions"}
         if any(not isinstance(getattr(self, k), bool) for k in flags):
             raise ValueError("Conditioning flags must be boolean")
         if any(isinstance(v, bool) or not isinstance(v, int) or v <= 0 for k, v in asdict(self).items() if k not in flags):
@@ -142,11 +143,17 @@ class VisualActionModel(nn.Module):
         error = (self.velocity(interpolated, t, memory, pad) - (targets - noise)).square()
         return (error * valid[:, :, None]).sum() / (valid.sum() * self.cfg.action_dim)
 
+    def direct_loss(self, memory, pad, targets, valid):
+        error = (self.sample(memory, pad) - targets).square()
+        return (error * valid[:, :, None]).sum() / (valid.sum() * self.cfg.action_dim)
+
     def sample(self, memory, pad, *, steps=None, noise=None):
         steps = self.cfg.flow_steps if steps is None else steps
         if isinstance(steps, bool) or not isinstance(steps, int) or steps < 1:
             raise ValueError("Flow steps must be a positive integer")
         x = torch.zeros(memory.shape[0], self.cfg.chunk, self.cfg.action_dim, device=memory.device) if noise is None else noise
+        if self.cfg.direct_actions:
+            return self.velocity(x, x.new_zeros(len(x)), memory, pad)
         for i in range(steps):
             t = x.new_full((len(x),), i / steps)
             x = x + self.velocity(x, t, memory, pad) / steps

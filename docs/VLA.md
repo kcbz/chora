@@ -163,6 +163,29 @@ cover conditioning fixes and bounded development rollouts. More varied training
 and recovery examples are needed; a competent controller and delay-aware runner
 are not yet established.
 
+## Direct-action familiar-scene pilot
+
+The `--direct-pilot` option keeps the two camera streams, joint state and
+instruction embedding. It uses a smaller fusion and action decoder and fits
+the 16 joint-target predictions directly, with one decoder pass per replan.
+
+The initial run fit every window from two Standard bowl demonstrations for
+1,200 updates. Its rollout at four ticks per replan placed the bowl on seed
+20000 and collided on seed 20001. Replanning every one or two ticks timed out on both.
+The one placement was on a training scene. This checkpoint remains outside
+the browser's qualified model selection.
+
+To reproduce from the existing three-episode pilot dataset:
+
+```bash
+.venv-vla/bin/python -m chora.vla.train --dataset outputs/vla/datasets/bowl-pilot-v1 \
+  --direct-pilot --steps 1200 --batch-size 8 --overfit-windows 0 --eval-every 1200 \
+  --device mps --output outputs/vla/training/bowl-direct-familiar-v1
+.venv-vla/bin/python -m chora.vla.runner \
+  --checkpoint outputs/vla/training/bowl-direct-familiar-v1/checkpoints/step-001200 \
+  --dataset outputs/vla/datasets/bowl-pilot-v1 --device mps --seeds 20000 20001 --execute 4
+```
+
 ## Visual policy in the browser
 
 In the lab select **Bowl · Standard platform**, then **VLA · Camera-based
